@@ -2,38 +2,27 @@
 
 HTTP Payment Authentication for TypeScript. Implements the ["Payment" HTTP Authentication Scheme](https://datatracker.ietf.org/doc/draft-ietf-httpauth-payment/) with pluggable payment methods & intents.
 
-## Overview
-
-mpay enables HTTP resources to require payment before access using standard HTTP authentication headers. It repurposes HTTP's existing authentication standards for payments:
-
-- **Challenges** are contained in `WWW-Authenticate`
-- **Credentials** are contained in `Authorization`
-
-The library is payment-method agnostic. Each method (Tempo, x402, Stripe, etc.) implements an adapter that defines how to structure challenges and execute payments.
-
 ```
-Client                                            Server
-   │                                                 │
-   │  (1) GET /resource                              │
-   ├────────────────────────────────────────────────>│
-   │                                                 │
-   │  (2) 402 Payment Required                       │
-   │      WWW-Authenticate: Payment method="tempo",  │
-   │        intent="charge", request=<base64url>     │
-   │<────────────────────────────────────────────────┤
-   │                                                 │
-   │  (3) Client signs payment credential            │
-   │                                                 │
-   │  (4) GET /resource                              │
-   │      Authorization: Payment <credential>        │
-   ├────────────────────────────────────────────────>│
-   │                                                 │
-   │  (5) Server verifies and executes payment       │
-   │                                                 │
-   │  (6) 200 OK                                     │
-   │      Payment-Receipt: <receipt>                 │
-   │<────────────────────────────────────────────────┤
-   │                                                 │
+Client                                              Server
+   │                                                   │
+   │  (1) fetch('/resource')                           │
+   ├──────────────────────────────────────────────────>│
+   │                                                   │
+   │       (2) challenge = method.intent(request, { ... })
+   │             402 + WWW-Authenticate: Payment ...   │
+   │<──────────────────────────────────────────────────┤
+   │                                                   │
+   │  (3) credential = Credential.fromChallenge(challenge)
+   │                                                   │
+   │  (4) fetch('/resource', Authorization: Payment credential)
+   ├──────────────────────────────────────────────────>│
+   │                                                   │
+   │                    (5) intent.verify(credential)  │
+   │                                                   │
+   │                    (6) Response.json({ ... })     │
+   │                        Payment-Receipt: <receipt> │
+   │<──────────────────────────────────────────────────┤
+   │                                                   │
 ```
 
 ## Install
