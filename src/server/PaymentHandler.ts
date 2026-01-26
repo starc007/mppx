@@ -103,16 +103,19 @@ function createIntentFn<intent extends MethodIntent.MethodIntent>(
   const { intent, realm, secretKey, verify } = parameters
 
   return (options) => {
-    const { description, ...request } = options
+    const { description, request } = options
+    // Default challenge expiry to the request's expires if present
+    const expires = options.expires ?? (request as { expires?: string }).expires
 
     // Recompute challenge from options. The HMAC-bound ID means we don't need to
     // store challenges server-side—if the client echoes back a credential with
     // a matching ID, we know it was issued by us with these exact parameters.
     const challenge = Challenge.fromIntent(intent, {
-      secretKey,
-      realm,
-      request: request as z.input<intent['schema']['request']>,
       description,
+      expires,
+      realm,
+      request,
+      secretKey,
     })
 
     async function handleFetch(request: globalThis.Request): Promise<IntentFn.Response> {
@@ -224,14 +227,20 @@ declare namespace createIntentFn {
 
 /** @internal */
 type IntentFn<intent extends MethodIntent.MethodIntent> = (
-  options: z.input<intent['schema']['request']> & {
-    /** Optional human-readable description of the payment. */
-    description?: string | undefined
-  },
+  options: IntentFn.Options<intent>,
 ) => IntentFn.Handler
 
 /** @internal */
 declare namespace IntentFn {
+  export type Options<intent extends MethodIntent.MethodIntent> = {
+    /** Optional human-readable description of the payment. */
+    description?: string | undefined
+    /** Optional challenge expiration timestamp (ISO 8601). */
+    expires?: string | undefined
+    /** Payment request parameters. */
+    request: z.input<intent['schema']['request']>
+  }
+
   export type Handler = FetchFn & NodeFn
 
   export type FetchFn = (request: globalThis.Request) => Promise<IntentFn.Response>

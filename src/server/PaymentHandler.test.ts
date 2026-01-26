@@ -41,10 +41,12 @@ describe('intent function', () => {
     const request = new Request('https://api.example.com/resource')
 
     const response = await handler.charge({
-      amount: '1000000',
-      currency: '0x20c0000000000000000000000000000000000001',
-      recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
-      expires: '2025-01-06T12:00:00Z',
+      request: {
+        amount: '1000000',
+        currency: '0x20c0000000000000000000000000000000000001',
+        recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
+        expires: '2025-01-06T12:00:00Z',
+      },
     })(request)
 
     expect(response.status).toBe(402)
@@ -59,10 +61,12 @@ describe('intent function', () => {
     })
 
     const response = await handler.charge({
-      amount: '1000000',
-      currency: '0x20c0000000000000000000000000000000000001',
-      recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
-      expires: '2025-01-06T12:00:00Z',
+      request: {
+        amount: '1000000',
+        currency: '0x20c0000000000000000000000000000000000001',
+        recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
+        expires: '2025-01-06T12:00:00Z',
+      },
     })(request)
 
     expect(response.status).toBe(402)
@@ -85,10 +89,12 @@ describe('intent function', () => {
     })
 
     const response = await handler.charge({
-      amount: '1000000',
-      currency: '0x20c0000000000000000000000000000000000001',
-      recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
-      expires: '2025-01-06T12:00:00Z',
+      request: {
+        amount: '1000000',
+        currency: '0x20c0000000000000000000000000000000000001',
+        recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
+        expires: '2025-01-06T12:00:00Z',
+      },
     })(request)
 
     expect(response.status).toBe(402)
@@ -106,6 +112,7 @@ describe('intent function', () => {
       secretKey,
       realm,
       request: paymentRequest,
+      expires: paymentRequest.expires,
     })
 
     const credential = Credential.from({
@@ -117,7 +124,7 @@ describe('intent function', () => {
       headers: { Authorization: Credential.serialize(credential) },
     })
 
-    const response = await handler.charge(paymentRequest)(request)
+    const response = await handler.charge({ request: paymentRequest })(request)
 
     expect(response.status).toBe(200)
     if (response.status !== 200) throw new Error('Expected 200')
@@ -147,6 +154,7 @@ describe('intent function', () => {
       secretKey,
       realm,
       request: paymentRequest,
+      expires: paymentRequest.expires,
     })
 
     const credential = Credential.from({
@@ -158,7 +166,7 @@ describe('intent function', () => {
       headers: { Authorization: Credential.serialize(credential) },
     })
 
-    const response = await handler.charge(paymentRequest)(request)
+    const response = await handler.charge({ request: paymentRequest })(request)
 
     expect(response.status).toBe(402)
   })
@@ -167,10 +175,12 @@ describe('intent function', () => {
     const request = new Request('https://api.example.com/resource')
 
     const response = await handler.charge({
-      amount: '1000000',
-      currency: '0x20c0000000000000000000000000000000000001',
-      recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
-      expires: '2025-01-06T12:00:00Z',
+      request: {
+        amount: '1000000',
+        currency: '0x20c0000000000000000000000000000000000001',
+        recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
+        expires: '2025-01-06T12:00:00Z',
+      },
     })(request)
 
     expect(response.status).toBe(402)
@@ -195,10 +205,12 @@ describe('intent function', () => {
     const request = new Request('https://api.example.com/resource')
 
     const response = await handler.charge({
-      amount: '1000000',
-      currency: '0x20c0000000000000000000000000000000000001',
-      recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
-      expires: '2025-01-06T12:00:00Z',
+      request: {
+        amount: '1000000',
+        currency: '0x20c0000000000000000000000000000000000001',
+        recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
+        expires: '2025-01-06T12:00:00Z',
+      },
       description: 'Payment for API access',
     })(request)
 
@@ -233,7 +245,7 @@ describe('intent function (Node.js)', () => {
 
   test('behavior: writes 402 when no Authorization header', async () => {
     const { server, port } = await startServer(async (req, res) => {
-      await handler.charge(paymentRequest)(req, res)
+      await handler.charge({ request: paymentRequest })(req, res)
       // 402 response is ended by handler, no need to call res.end()
     })
 
@@ -255,6 +267,7 @@ describe('intent function (Node.js)', () => {
             "type": "https://tempoxyz.github.io/payment-auth-spec/problems/payment-required",
           },
           "challenge": {
+            "expires": "2025-01-06T12:00:00Z",
             "id": "[id]",
             "intent": "charge",
             "method": "tempo",
@@ -279,6 +292,7 @@ describe('intent function (Node.js)', () => {
       secretKey,
       realm,
       request: paymentRequest,
+      expires: paymentRequest.expires,
     })
 
     const credential = Credential.from({
@@ -287,7 +301,7 @@ describe('intent function (Node.js)', () => {
     })
 
     const { server, port } = await startServer(async (req, res) => {
-      await handler.charge(paymentRequest)(req, res)
+      await handler.charge({ request: paymentRequest })(req, res)
       res.end('OK')
     })
 
