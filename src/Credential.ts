@@ -1,17 +1,20 @@
 import { Base64 } from 'ox'
 import type * as Challenge from './Challenge.js'
-import * as Request from './Request.js'
+import * as PaymentRequest from './Request.js'
 
+/**
+ * A payment credential containing the challenge and payment proof.
+ */
 export type Credential<
   payload = unknown,
   challenge extends Challenge.Challenge = Challenge.Challenge,
 > = {
-  /** Echoed challenge parameters from the original 402 response. */
-  challenge: Omit<challenge, 'request'> & { request: string }
+  /** The challenge from the 402 response. */
+  challenge: challenge
   /** Method-specific payment proof. */
   payload: payload
   /** Optional payer identifier as a DID (e.g., "did:pkh:eip155:1:0x..."). */
-  source?: string | undefined
+  source?: string
 }
 
 /**
@@ -32,7 +35,19 @@ export function deserialize<payload = unknown>(value: string): Credential<payloa
   if (!prefixMatch?.[1]) throw new Error('Missing Payment scheme.')
   try {
     const json = Base64.toString(prefixMatch[1])
-    return JSON.parse(json) as Credential<payload>
+    const parsed = JSON.parse(json) as {
+      challenge: Omit<Challenge.Challenge, 'request'> & { request: string }
+      payload: payload
+      source?: string
+    }
+    return {
+      challenge: {
+        ...parsed.challenge,
+        request: PaymentRequest.deserialize(parsed.challenge.request),
+      },
+      payload: parsed.payload,
+      ...(parsed.source && { source: parsed.source }),
+    } as Credential<payload>
   } catch {
     throw new Error('Invalid base64url or JSON.')
   }
@@ -41,10 +56,8 @@ export function deserialize<payload = unknown>(value: string): Credential<payloa
 /**
  * Creates a credential from the given parameters.
  *
- * The challenge's request field is automatically serialized to base64url.
- *
  * @param parameters - Credential parameters with a Challenge object.
- * @returns A credential with serialized challenge.
+ * @returns A credential.
  *
  * @example
  * ```ts
@@ -61,15 +74,7 @@ export function from<const parameters extends from.Parameters>(
 ): Credential<parameters['payload'], parameters['challenge']> {
   const { challenge, payload, source } = parameters
   return {
-    challenge: {
-      id: challenge.id,
-      intent: challenge.intent,
-      method: challenge.method,
-      realm: challenge.realm,
-      request: Request.serialize(challenge.request),
-      ...(challenge.digest && { digest: challenge.digest }),
-      ...(challenge.expires && { expires: challenge.expires }),
-    },
+    challenge,
     payload,
     ...(source && { source }),
   } as Credential<parameters['payload'], parameters['challenge']>
@@ -120,7 +125,15 @@ export function fromRequest<payload = unknown>(request: Request): Credential<pay
  * ```
  */
 export function serialize(credential: Credential): string {
-  const json = JSON.stringify(credential)
+  const wire = {
+    challenge: {
+      ...credential.challenge,
+      request: PaymentRequest.serialize(credential.challenge.request),
+    },
+    payload: credential.payload,
+    ...(credential.source && { source: credential.source }),
+  }
+  const json = JSON.stringify(wire)
   const encoded = Base64.fromString(json, { pad: false, url: true })
   return `Payment ${encoded}`
 }

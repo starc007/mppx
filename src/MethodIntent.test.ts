@@ -149,6 +149,7 @@ describe('fromIntent', () => {
         request: z.object({
           amount: z.string(),
           currency: z.string(),
+          recipient: z.optional(z.string()),
         }),
       },
     })

@@ -1,7 +1,7 @@
 import * as Challenge from '../Challenge.js'
 import type * as Errors from '../Errors.js'
 
-export function send402(parameters: send402.Parameters): Response {
+export function requirePayment(parameters: requirePayment.Parameters): Response {
   const { challenge, error } = parameters
 
   const headers: Record<string, string> = { 'WWW-Authenticate': Challenge.serialize(challenge) }
@@ -16,7 +16,7 @@ export function send402(parameters: send402.Parameters): Response {
   return new Response(body, { status: 402, headers })
 }
 
-export declare namespace send402 {
+export declare namespace requirePayment {
   type Parameters = {
     challenge: Challenge.Challenge
     error?: Errors.PaymentError | undefined

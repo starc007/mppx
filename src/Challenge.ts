@@ -1,4 +1,6 @@
-import { Base64, Bytes, Hash } from 'ox'
+import { hmac } from '@noble/hashes/hmac.js'
+import { sha256 } from '@noble/hashes/sha2.js'
+import { Base64, Bytes } from 'ox'
 import type { OneOf } from './internal/types.js'
 import type * as MethodIntent from './MethodIntent.js'
 import * as Request from './Request.js'
@@ -47,10 +49,11 @@ export const Schema = z.object({
  * }
  * ```
  */
-export type Challenge<request = Record<string, unknown>> = Omit<
+export type Challenge<request = Record<string, unknown>, intent extends string = string> = Omit<
   z.infer<typeof Schema>,
-  'request'
+  'intent' | 'request'
 > & {
+  intent: intent
   request: request
 }
 
@@ -268,20 +271,16 @@ export function deserialize(value: string): Challenge {
     if (key && value) result[key] = value
   }
 
-  try {
-    const parsed = z
-      .object({
-        ...Schema.shape,
-        request: z.string(),
-      })
-      .parse(result)
+  const parsed = z
+    .object({
+      ...Schema.shape,
+      request: z.string(),
+    })
+    .parse(result)
 
-    return {
-      ...parsed,
-      request: Request.deserialize(parsed.request),
-    }
-  } catch {
-    throw new Error('Invalid challenge format.')
+  return {
+    ...parsed,
+    request: Request.deserialize(parsed.request),
   }
 }
 
@@ -379,6 +378,6 @@ function computeId(challenge: Omit<Challenge, 'id'>, options: { secretKey: strin
 
   const key = Bytes.fromString(options.secretKey)
   const data = Bytes.fromString(input)
-  const hmac = Hash.sha256(Bytes.concat(key, data), { as: 'Bytes' })
-  return Base64.fromBytes(hmac, { url: true, pad: false })
+  const mac = hmac(sha256, key, data)
+  return Base64.fromBytes(mac, { url: true, pad: false })
 }

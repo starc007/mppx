@@ -7,6 +7,9 @@ export default defineConfig({
       mpay: path.resolve(import.meta.dirname, 'src'),
       '~test': path.resolve(import.meta.dirname, 'test'),
     },
+    coverage: {
+      exclude: ['test/**'],
+    },
     include: ['src/**/*.test.ts'],
     globals: true,
     retry: 3,

@@ -17,7 +17,7 @@ const handler = PaymentHandler.from({
     charge: Intents.charge,
     authorize: Intents.authorize,
   },
-  async verify(_parameters) {
+  async verify() {
     return {
       status: 'success' as const,
       timestamp: new Date().toISOString(),
@@ -39,17 +39,17 @@ describe('intent function', () => {
   test('behavior: returns 402 response when no Authorization header', async () => {
     const request = new Request('https://api.example.com/resource')
 
-    const result = await handler.charge(request, {
+    const response = await handler.charge(request, {
       amount: '1000000',
       currency: '0x20c0000000000000000000000000000000000001',
       recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
       expires: '2025-01-06T12:00:00Z',
     })
 
-    expect(result.status).toBe(402)
-    if (result.status !== 402) throw new Error('Expected 402')
-    expect(result.response.status).toBe(402)
-    expect(result.response.headers.get('WWW-Authenticate')).toMatch(/^Payment /)
+    expect(response.status).toBe(402)
+    if (response.status !== 402) throw new Error('Expected 402')
+    expect(response.challenge.status).toBe(402)
+    expect(response.challenge.headers.get('WWW-Authenticate')).toMatch(/^Payment /)
   })
 
   test('behavior: returns 402 when invalid Authorization header', async () => {
@@ -57,14 +57,14 @@ describe('intent function', () => {
       headers: { Authorization: 'Bearer invalid' },
     })
 
-    const result = await handler.charge(request, {
+    const response = await handler.charge(request, {
       amount: '1000000',
       currency: '0x20c0000000000000000000000000000000000001',
       recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
       expires: '2025-01-06T12:00:00Z',
     })
 
-    expect(result.status).toBe(402)
+    expect(response.status).toBe(402)
   })
 
   test('behavior: returns 402 when credential challenge id does not match', async () => {
@@ -83,14 +83,14 @@ describe('intent function', () => {
       headers: { Authorization: Credential.serialize(credential) },
     })
 
-    const result = await handler.charge(request, {
+    const response = await handler.charge(request, {
       amount: '1000000',
       currency: '0x20c0000000000000000000000000000000000001',
       recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
       expires: '2025-01-06T12:00:00Z',
     })
 
-    expect(result.status).toBe(402)
+    expect(response.status).toBe(402)
   })
 
   test('behavior: returns 200 with receipt wrapper when credential is valid', async () => {
@@ -116,13 +116,21 @@ describe('intent function', () => {
       headers: { Authorization: Credential.serialize(credential) },
     })
 
-    const result = await handler.charge(request, requestOptions)
+    const response = await handler.charge(request, requestOptions)
 
-    expect(result.status).toBe(200)
-    if (result.status !== 200) throw new Error('Expected 200')
+    expect(response.status).toBe(200)
+    if (response.status !== 200) throw new Error('Expected 200')
 
-    const response = result.receipt(new Response('OK', { status: 200 }))
-    expect(response.headers.get('Payment-Receipt')).toBeDefined()
+    const res = response.withReceipt(new Response('OK', { status: 200 }))
+    // biome-ignore lint/style/noNonNullAssertion: _
+    const receipt = Receipt.deserialize(res.headers.get('Payment-Receipt')!)
+    expect({ ...receipt, timestamp: '[timestamp]' }).toMatchInlineSnapshot(`
+      {
+        "reference": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "success",
+        "timestamp": "[timestamp]",
+      }
+    `)
   })
 
   test('behavior: returns 402 when credential payload is invalid', async () => {
@@ -148,25 +156,25 @@ describe('intent function', () => {
       headers: { Authorization: Credential.serialize(credential) },
     })
 
-    const result = await handler.charge(request, requestOptions)
+    const response = await handler.charge(request, requestOptions)
 
-    expect(result.status).toBe(402)
+    expect(response.status).toBe(402)
   })
 
   test('behavior: 402 response contains correct challenge', async () => {
     const request = new Request('https://api.example.com/resource')
 
-    const result = await handler.charge(request, {
+    const response = await handler.charge(request, {
       amount: '1000000',
       currency: '0x20c0000000000000000000000000000000000001',
       recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
       expires: '2025-01-06T12:00:00Z',
     })
 
-    expect(result.status).toBe(402)
-    if (result.status !== 402) throw new Error('Expected 402')
+    expect(response.status).toBe(402)
+    if (response.status !== 402) throw new Error('Expected 402')
 
-    const header = result.response.headers.get('WWW-Authenticate')
+    const header = response.challenge.headers.get('WWW-Authenticate')
     if (!header) throw new Error('Expected WWW-Authenticate header')
     const challenge = Challenge.deserialize(header)
 
