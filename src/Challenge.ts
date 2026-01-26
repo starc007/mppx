@@ -257,7 +257,7 @@ export function serialize(challenge: Challenge): string {
  */
 export function deserialize(value: string): Challenge {
   const prefixMatch = value.match(/^Payment\s+(.+)$/i)
-  if (!prefixMatch?.[1]) throw new Error('Invalid challenge: missing Payment scheme')
+  if (!prefixMatch?.[1]) throw new Error('Missing Payment scheme.')
 
   const params = prefixMatch[1]
   const result: Record<string, string> = {}
@@ -268,16 +268,20 @@ export function deserialize(value: string): Challenge {
     if (key && value) result[key] = value
   }
 
-  const parsed = z
-    .object({
-      ...Schema.shape,
-      request: z.string(),
-    })
-    .parse(result)
+  try {
+    const parsed = z
+      .object({
+        ...Schema.shape,
+        request: z.string(),
+      })
+      .parse(result)
 
-  return {
-    ...parsed,
-    request: Request.deserialize(parsed.request),
+    return {
+      ...parsed,
+      request: Request.deserialize(parsed.request),
+    }
+  } catch {
+    throw new Error('Invalid challenge format.')
   }
 }
 
@@ -302,7 +306,7 @@ export function fromHeader(header: string): Challenge {
  * Extracts the challenge from a Headers object.
  *
  * @param headers - The HTTP headers.
- * @returns The deserialized challenge.
+ * @returns The deserialized challenge, or undefined if no WWW-Authenticate header.
  *
  * @example
  * ```ts
@@ -313,7 +317,7 @@ export function fromHeader(header: string): Challenge {
  */
 export function fromHeaders(headers: Headers): Challenge {
   const header = headers.get('WWW-Authenticate')
-  if (!header) throw new Error('Missing WWW-Authenticate header')
+  if (!header) throw new Error('Missing WWW-Authenticate header.')
   return deserialize(header)
 }
 
@@ -333,12 +337,8 @@ export function fromHeaders(headers: Headers): Challenge {
  * ```
  */
 export function fromResponse(response: Response): Challenge {
-  if (response.status !== 402) throw new Error(`Expected 402 status, got ${response.status}`)
-
-  const header = response.headers.get('WWW-Authenticate')
-  if (!header) throw new Error('Missing WWW-Authenticate header')
-
-  return deserialize(header)
+  if (response.status !== 402) throw new Error('Response status is not 402.')
+  return fromHeaders(response.headers)
 }
 
 /**

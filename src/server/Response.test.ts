@@ -1,0 +1,31 @@
+import { describe, expect, test } from 'vitest'
+import * as Challenge from '../Challenge.js'
+import * as Errors from '../Errors.js'
+import * as Response from './Response.js'
+
+const challenge = Challenge.from({
+  id: 'abc123',
+  intent: 'charge',
+  method: 'tempo',
+  realm: 'api.example.com',
+  request: { amount: '1000000' },
+})
+
+describe('send402', () => {
+  test('returns 402 Response with WWW-Authenticate header', () => {
+    const response = Response.send402({ challenge })
+
+    expect(response.status).toBe(402)
+    expect(response.headers.get('WWW-Authenticate')).toBe(Challenge.serialize(challenge))
+  })
+
+  test('includes problem details in body when error provided', async () => {
+    const error = new Errors.PaymentRequiredError()
+
+    const response = Response.send402({ challenge, error })
+
+    expect(response.headers.get('Content-Type')).toBe('application/problem+json')
+    const body = await response.json()
+    expect(body).toEqual(error.toProblemDetails(challenge.id))
+  })
+})

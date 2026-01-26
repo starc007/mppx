@@ -2,9 +2,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { z } from 'zod/mini'
 import * as Challenge from '../Challenge.js'
 import * as Credential from '../Credential.js'
+import * as Errors from '../Errors.js'
 import type * as MethodIntent from '../MethodIntent.js'
 import * as Receipt from '../Receipt.js'
-import { type AnyRequest, getHeader, isFetchRequest, send402, sendReceipt } from './http.js'
+import * as Request from './Request.js'
+import * as Response from './Response.js'
 
 /**
  * Server-side payment handler.
@@ -20,21 +22,29 @@ export type PaymentHandler<
   /** Server realm (e.g., hostname). */
   realm: string
 } & {
-  [K in keyof intents]: IntentFn<intents[K]>
+  [intent in keyof intents]: IntentFn<intents[intent]>
 }
+
+/**
+ * Result returned by an intent function (Fetch API).
+ */
+export type IntentResult =
+  | { response: Response; status: 402 }
+  | { receipt: (response: Response) => Response; status: 200 }
 
 /**
  * Intent function type with overloads for Fetch and Node.js.
  */
 export type IntentFn<intent extends MethodIntent.MethodIntent> = {
-  /** Fetch API: returns 402 Response or null if verified. */
-  (request: Request, options: z.input<intent['schema']['request']>): Promise<Response | null>
-  /** Node.js: writes 402 to response or returns null if verified. */
+  /** Fetch API: returns 402 response or receipt wrapper. */
+  (request: Request, options: z.input<intent['schema']['request']>): Promise<IntentResult>
+
+  /** Node.js: writes headers to response. */
   (
     request: IncomingMessage,
     response: ServerResponse,
     options: z.input<intent['schema']['request']>,
-  ): Promise<true | null>
+  ): Promise<void>
 }
 
 /**
@@ -90,83 +100,109 @@ export declare namespace from {
     /** Verify a credential and return a receipt. */
     verify: VerifyFn<intents>
   }
-
-  type VerifyContext = {
-    /** The original request. */
-    request: AnyRequest
-  }
 }
 
 export type VerifyFn<intents extends Record<string, MethodIntent.MethodIntent>> = (
-  credential: Credential.Credential<CredentialPayloadUnion<intents>>,
-  challenge: Challenge.Challenge<RequestUnion<intents>>,
-  context: from.VerifyContext,
-) => Receipt.Receipt | Promise<Receipt.Receipt>
+  parameters: VerifyParameters<intents>,
+) => Promise<Receipt.Receipt>
 
 /** @internal */
-type CredentialPayloadUnion<intents extends Record<string, MethodIntent.MethodIntent>> = {
-  [K in keyof intents]: z.output<intents[K]['schema']['credential']['payload']>
+type VerifyParameters<intents extends Record<string, MethodIntent.MethodIntent>> = {
+  [K in keyof intents]: {
+    credential: Credential.Credential<
+      z.output<intents[K]['schema']['credential']['payload']>,
+      Challenge.Challenge<z.output<intents[K]['schema']['request']>>
+    >
+    request: Request
+  }
 }[keyof intents]
 
 /** @internal */
-type RequestUnion<intents extends Record<string, MethodIntent.MethodIntent>> = {
-  [K in keyof intents]: z.output<intents[K]['schema']['request']>
-}[keyof intents]
-
-/** @internal */
-function _intentFn<intent extends MethodIntent.MethodIntent>(
-  parameters: _intentFn.Parameters<intent>,
+// biome-ignore lint/correctness/noUnusedVariables: _
+function intentFn<intent extends MethodIntent.MethodIntent>(
+  parameters: intentFn.Parameters<intent>,
 ): IntentFn<intent> {
   const { intent, realm, secretKey, verify } = parameters
 
-  return async function intentFn(
-    request: AnyRequest,
-    responseOrOptions: ServerResponse | z.input<intent['schema']['request']>,
-    maybeOptions?: z.input<intent['schema']['request']>,
-  ): Promise<Response | true | null> {
-    const response = isFetchRequest(request) ? undefined : (responseOrOptions as ServerResponse)
-    const options = (isFetchRequest(request) ? responseOrOptions : maybeOptions) as z.input<
-      intent['schema']['request']
-    >
-
+  async function handleFetch(
+    request: Request,
+    options: z.input<intent['schema']['request']>,
+  ): Promise<IntentResult> {
     const challenge = Challenge.fromIntent(intent, {
       secretKey,
       realm,
       request: options,
     })
 
-    const challengeHeader = Challenge.serialize(challenge)
+    const send402 = (error: Errors.PaymentError): IntentResult => ({
+      response: Response.send402({ challenge, error }),
+      status: 402,
+    })
 
-    const authHeader = getHeader(request, 'Authorization')
-    if (!authHeader) return send402(challengeHeader, response)
+    const header = request.headers.get('Authorization')
+    if (!header) return send402(new Errors.PaymentRequiredError())
 
     let credential: Credential.Credential
     try {
-      credential = Credential.deserialize(authHeader)
-    } catch {
-      return send402(challengeHeader, response)
+      credential = Credential.deserialize(header)
+    } catch (e) {
+      return send402(new Errors.MalformedCredentialError({ reason: (e as Error).message }))
     }
 
-    if (!Challenge.verify(challenge, { secretKey })) return send402(challengeHeader, response)
-    if (credential.id !== challenge.id) return send402(challengeHeader, response)
+    if (credential.challenge.id !== challenge.id) {
+      return send402(
+        new Errors.InvalidChallengeError({
+          id: credential.challenge.id,
+          reason: 'credential does not match the issued challenge',
+        }),
+      )
+    }
 
     try {
       intent.schema.credential.payload.parse(credential.payload)
-    } catch {
-      return send402(challengeHeader, response)
+    } catch (e) {
+      return send402(new Errors.InvalidPayloadError({ reason: (e as Error).message }))
     }
 
-    const receipt = await verify(
-      credential as Credential.Credential<z.output<intent['schema']['credential']['payload']>>,
-      challenge,
-      { request },
-    )
+    const receiptData = await verify({ credential, request } as never)
 
-    const receiptHeader = Receipt.serialize(receipt)
-    sendReceipt(receiptHeader, response)
+    return {
+      receipt(res: globalThis.Response) {
+        const headers = new Headers(res.headers)
+        headers.set('Payment-Receipt', Receipt.serialize(receiptData))
+        return new globalThis.Response(res.body, {
+          status: res.status,
+          statusText: res.statusText,
+          headers,
+        })
+      },
+      status: 200,
+    }
+  }
 
-    return null
-  } as IntentFn<intent>
+  async function handleNode(
+    request: IncomingMessage,
+    response: ServerResponse,
+    options: z.input<intent['schema']['request']>,
+  ): Promise<void> {
+    const fetchRequest = Request.fromNodeRequest(request)
+    const result = await handleFetch(fetchRequest, options)
+
+    if (result.status === 402) {
+      response.writeHead(402, Object.fromEntries(result.response.headers))
+      const body = await result.response.text()
+      if (body) response.write(body)
+    } else {
+      const wrapped = result.receipt(new globalThis.Response())
+      // biome-ignore lint/style/noNonNullAssertion: _
+      response.setHeader('Payment-Receipt', wrapped.headers.get('Payment-Receipt')!)
+    }
+  }
+
+  return ((request, responseOrOptions, maybeOptions) =>
+    request instanceof globalThis.Request
+      ? handleFetch(request, responseOrOptions as z.input<intent['schema']['request']>)
+      : handleNode(request, responseOrOptions, maybeOptions)) as IntentFn<intent>
 }
 
 declare namespace intentFn {

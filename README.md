@@ -45,7 +45,7 @@ const payment = PaymentHandler.tempo({
 })
 
 export async function handler(request: Request) {
-  const challenge = await payment.charge(request, {
+  const result = await payment.charge(request, {
     amount: '1000000',
     asset: '0x20c0000000000000000000000000000000000001',
     destination: '0x742d35Cc6634c0532925a3b844bC9e7595F8fE00',
@@ -53,7 +53,7 @@ export async function handler(request: Request) {
   })
 
   // Payment required — send 402 response with challenge
-  if (challenge) return challenge
+  if (result.status === 402) return result.challenge
 
   // Payment verified — return resource
   return Response.json({ data: '...' })

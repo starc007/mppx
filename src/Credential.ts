@@ -1,40 +1,17 @@
 import { Base64 } from 'ox'
-import { z } from 'zod/mini'
+import type * as Challenge from './Challenge.js'
+import * as Request from './Request.js'
 
-/**
- * Zod schema for a payment credential.
- *
- * @example
- * ```ts
- * import { Credential } from 'mpay'
- *
- * const credential = Credential.Schema.parse(data)
- * ```
- */
-export const Schema = z.object({
-  /** The challenge ID from the original 402 response. */
-  id: z.string(),
-  /** The validated credential payload. */
-  payload: z.unknown(),
-  /** Optional payer identifier as a DID (e.g., "did:pkh:eip155:1:0x..."). */
-  source: z.optional(z.string()),
-})
-
-/**
- * The credential passed to the verify function.
- *
- * @example
- * ```ts
- * import { Credential } from 'mpay'
- *
- * const credential: Credential.Credential<{ signature: string }> = {
- *   id: 'challenge-id',
- *   payload: { signature: '0x...' },
- * }
- * ```
- */
-export type Credential<payload = unknown> = Omit<z.infer<typeof Schema>, 'payload'> & {
+export type Credential<
+  payload = unknown,
+  challenge extends Challenge.Challenge = Challenge.Challenge,
+> = {
+  /** Echoed challenge parameters from the original 402 response. */
+  challenge: Omit<challenge, 'request'> & { request: string }
+  /** Method-specific payment proof. */
   payload: payload
+  /** Optional payer identifier as a DID (e.g., "did:pkh:eip155:1:0x..."). */
+  source?: string | undefined
 }
 
 /**
@@ -52,30 +29,61 @@ export type Credential<payload = unknown> = Omit<z.infer<typeof Schema>, 'payloa
  */
 export function deserialize<payload = unknown>(value: string): Credential<payload> {
   const prefixMatch = value.match(/^Payment\s+(.+)$/i)
-  if (!prefixMatch?.[1]) throw new Error('Invalid credential: missing Payment scheme')
-
-  const json = Base64.toString(prefixMatch[1])
-  return Schema.parse(JSON.parse(json)) as Credential<payload>
+  if (!prefixMatch?.[1]) throw new Error('Missing Payment scheme.')
+  try {
+    const json = Base64.toString(prefixMatch[1])
+    return JSON.parse(json) as Credential<payload>
+  } catch {
+    throw new Error('Invalid base64url or JSON.')
+  }
 }
 
 /**
  * Creates a credential from the given parameters.
  *
- * @param parameters - Credential parameters.
- * @returns A credential.
+ * The challenge's request field is automatically serialized to base64url.
+ *
+ * @param parameters - Credential parameters with a Challenge object.
+ * @returns A credential with serialized challenge.
  *
  * @example
  * ```ts
- * import { Credential } from 'mpay'
+ * import { Credential, Challenge } from 'mpay'
  *
  * const credential = Credential.from({
- *   id: 'challenge-id',
+ *   challenge,
  *   payload: { signature: '0x...' },
  * })
  * ```
  */
-export function from<credential extends Credential>(credential: credential): credential {
-  return credential
+export function from<const parameters extends from.Parameters>(
+  parameters: parameters,
+): Credential<parameters['payload'], parameters['challenge']> {
+  const { challenge, payload, source } = parameters
+  return {
+    challenge: {
+      id: challenge.id,
+      intent: challenge.intent,
+      method: challenge.method,
+      realm: challenge.realm,
+      request: Request.serialize(challenge.request),
+      ...(challenge.digest && { digest: challenge.digest }),
+      ...(challenge.expires && { expires: challenge.expires }),
+    },
+    payload,
+    ...(source && { source }),
+  } as Credential<parameters['payload'], parameters['challenge']>
+}
+
+export declare namespace from {
+  type Parameters = {
+    /** The challenge from the 402 response. */
+    challenge: Challenge.Challenge
+    /** Method-specific payment proof. */
+    payload: unknown
+    /** Optional payer identifier as a DID (e.g., "did:pkh:eip155:1:0x..."). */
+    source?: string
+  }
 }
 
 /**
@@ -93,8 +101,7 @@ export function from<credential extends Credential>(credential: credential): cre
  */
 export function fromRequest<payload = unknown>(request: Request): Credential<payload> {
   const header = request.headers.get('Authorization')
-  if (!header) throw new Error('Missing Authorization header')
-
+  if (!header) throw new Error('Missing Authorization header.')
   return deserialize<payload>(header)
 }
 
@@ -109,7 +116,7 @@ export function fromRequest<payload = unknown>(request: Request): Credential<pay
  * import { Credential } from 'mpay'
  *
  * const header = Credential.serialize(credential)
- * // => 'Payment eyJpZCI6ImNoYWxsZW5nZS1pZCIsInBheWxvYWQiOnsi...'
+ * // => 'Payment eyJjaGFsbGVuZ2UiOnsi...'
  * ```
  */
 export function serialize(credential: Credential): string {

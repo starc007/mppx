@@ -1,6 +1,8 @@
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { describe, expect, test } from 'vitest'
 import * as Challenge from '../Challenge.js'
 import * as Credential from '../Credential.js'
+import * as Receipt from '../Receipt.js'
 import * as Intents from '../tempo/Intents.js'
 import * as PaymentHandler from './PaymentHandler.js'
 
@@ -15,7 +17,7 @@ const handler = PaymentHandler.from({
     charge: Intents.charge,
     authorize: Intents.authorize,
   },
-  async verify(_credential, _challenge) {
+  async verify(_parameters) {
     return {
       status: 'success' as const,
       timestamp: new Date().toISOString(),
@@ -34,7 +36,7 @@ describe('from', () => {
 })
 
 describe('intent function', () => {
-  test('behavior: returns 402 when no Authorization header', async () => {
+  test('behavior: returns 402 response when no Authorization header', async () => {
     const request = new Request('https://api.example.com/resource')
 
     const result = await handler.charge(request, {
@@ -44,9 +46,10 @@ describe('intent function', () => {
       expires: '2025-01-06T12:00:00Z',
     })
 
-    expect(result).toBeInstanceOf(Response)
-    expect((result as Response).status).toBe(402)
-    expect((result as Response).headers.get('WWW-Authenticate')).toMatch(/^Payment /)
+    expect(result.status).toBe(402)
+    if (result.status !== 402) throw new Error('Expected 402')
+    expect(result.response.status).toBe(402)
+    expect(result.response.headers.get('WWW-Authenticate')).toMatch(/^Payment /)
   })
 
   test('behavior: returns 402 when invalid Authorization header', async () => {
@@ -61,13 +64,18 @@ describe('intent function', () => {
       expires: '2025-01-06T12:00:00Z',
     })
 
-    expect(result).toBeInstanceOf(Response)
-    expect((result as Response).status).toBe(402)
+    expect(result.status).toBe(402)
   })
 
-  test('behavior: returns 402 when credential id does not match challenge', async () => {
+  test('behavior: returns 402 when credential challenge id does not match', async () => {
     const credential = Credential.from({
-      id: 'wrong-id',
+      challenge: {
+        id: 'wrong-id',
+        realm: 'api.example.com',
+        method: 'tempo',
+        intent: 'charge',
+        request: { amount: '1000' },
+      },
       payload: { signature: '0xabc', type: 'transaction' as const },
     })
 
@@ -82,11 +90,10 @@ describe('intent function', () => {
       expires: '2025-01-06T12:00:00Z',
     })
 
-    expect(result).toBeInstanceOf(Response)
-    expect((result as Response).status).toBe(402)
+    expect(result.status).toBe(402)
   })
 
-  test('behavior: returns null when credential is valid', async () => {
+  test('behavior: returns 200 with receipt wrapper when credential is valid', async () => {
     const requestOptions = {
       amount: '1000000',
       currency: '0x20c0000000000000000000000000000000000001',
@@ -101,7 +108,7 @@ describe('intent function', () => {
     })
 
     const credential = Credential.from({
-      id: challenge.id,
+      challenge,
       payload: { signature: `0x${'ab'.repeat(65)}`, type: 'transaction' as const },
     })
 
@@ -111,7 +118,11 @@ describe('intent function', () => {
 
     const result = await handler.charge(request, requestOptions)
 
-    expect(result).toBeNull()
+    expect(result.status).toBe(200)
+    if (result.status !== 200) throw new Error('Expected 200')
+
+    const response = result.receipt(new Response('OK', { status: 200 }))
+    expect(response.headers.get('Payment-Receipt')).toBeDefined()
   })
 
   test('behavior: returns 402 when credential payload is invalid', async () => {
@@ -129,7 +140,7 @@ describe('intent function', () => {
     })
 
     const credential = Credential.from({
-      id: challenge.id,
+      challenge,
       payload: { invalid: 'payload' },
     })
 
@@ -139,11 +150,10 @@ describe('intent function', () => {
 
     const result = await handler.charge(request, requestOptions)
 
-    expect(result).toBeInstanceOf(Response)
-    expect((result as Response).status).toBe(402)
+    expect(result.status).toBe(402)
   })
 
-  test('behavior: challenge contains correct method and intent', async () => {
+  test('behavior: 402 response contains correct challenge', async () => {
     const request = new Request('https://api.example.com/resource')
 
     const result = await handler.charge(request, {
@@ -153,7 +163,10 @@ describe('intent function', () => {
       expires: '2025-01-06T12:00:00Z',
     })
 
-    const header = (result as Response).headers.get('WWW-Authenticate')
+    expect(result.status).toBe(402)
+    if (result.status !== 402) throw new Error('Expected 402')
+
+    const header = result.response.headers.get('WWW-Authenticate')
     if (!header) throw new Error('Expected WWW-Authenticate header')
     const challenge = Challenge.deserialize(header)
 
@@ -166,5 +179,107 @@ describe('intent function', () => {
       recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
       expires: '2025-01-06T12:00:00Z',
     })
+  })
+})
+
+describe('intent function (Node.js)', () => {
+  const requestOptions = {
+    amount: '1000000',
+    currency: '0x20c0000000000000000000000000000000000001',
+    recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
+    expires: '2025-01-06T12:00:00Z',
+  }
+
+  async function startServer(
+    handleRequest: (req: IncomingMessage, res: ServerResponse) => Promise<void>,
+  ) {
+    const { createServer } = await import('node:http')
+    const server = createServer(handleRequest)
+    await new Promise<void>((resolve) => server.listen(0, resolve))
+    const address = server.address() as { port: number }
+    return { server, port: address.port }
+  }
+
+  test('behavior: writes 402 when no Authorization header', async () => {
+    const { server, port } = await startServer(async (req, res) => {
+      await handler.charge(req, res, requestOptions)
+      res.end()
+    })
+
+    try {
+      const response = await fetch(`http://localhost:${port}`)
+      const challenge = Challenge.deserialize(response.headers.get('WWW-Authenticate')!)
+      const body = (await response.json()) as { challengeId: string }
+      expect({
+        status: response.status,
+        challenge: { ...challenge, id: '[id]' },
+        body: { ...body, challengeId: '[id]' },
+      }).toMatchInlineSnapshot(`
+        {
+          "body": {
+            "challengeId": "[id]",
+            "detail": "Payment is required.",
+            "status": 402,
+            "title": "PaymentRequiredError",
+            "type": "https://tempoxyz.github.io/payment-auth-spec/problems/payment-required",
+          },
+          "challenge": {
+            "id": "[id]",
+            "intent": "charge",
+            "method": "tempo",
+            "realm": "api.example.com",
+            "request": {
+              "amount": "1000000",
+              "currency": "0x20c0000000000000000000000000000000000001",
+              "expires": "2025-01-06T12:00:00Z",
+              "recipient": "0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00",
+            },
+          },
+          "status": 402,
+        }
+      `)
+    } finally {
+      server.close()
+    }
+  })
+
+  test('behavior: sets receipt header when credential is valid', async () => {
+    const challenge = Challenge.fromIntent(Intents.charge, {
+      secretKey,
+      realm,
+      request: requestOptions,
+    })
+
+    const credential = Credential.from({
+      challenge,
+      payload: { signature: `0x${'ab'.repeat(65)}`, type: 'transaction' as const },
+    })
+
+    const { server, port } = await startServer(async (req, res) => {
+      await handler.charge(req, res, requestOptions)
+      res.end('OK')
+    })
+
+    try {
+      const response = await fetch(`http://localhost:${port}`, {
+        headers: { Authorization: Credential.serialize(credential) },
+      })
+      const receipt = Receipt.deserialize(response.headers.get('Payment-Receipt')!)
+      expect({
+        status: response.status,
+        receipt: { ...receipt, timestamp: '[timestamp]' },
+      }).toMatchInlineSnapshot(`
+        {
+          "receipt": {
+            "reference": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "success",
+            "timestamp": "[timestamp]",
+          },
+          "status": 200,
+        }
+      `)
+    } finally {
+      server.close()
+    }
   })
 })

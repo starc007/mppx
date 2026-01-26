@@ -297,14 +297,12 @@ describe('deserialize', () => {
     const header = Challenge.serialize(original)
     const challenge = Challenge.deserialize(header)
 
-    expect(challenge.digest).toBe('sha-256=abc')
-    expect(challenge.expires).toBe('2025-01-06T12:00:00Z')
+    expect(challenge?.digest).toBe('sha-256=abc')
+    expect(challenge?.expires).toBe('2025-01-06T12:00:00Z')
   })
 
-  test('error: missing Payment scheme', () => {
-    expect(() => Challenge.deserialize('Bearer token')).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Invalid challenge: missing Payment scheme]`,
-    )
+  test('error: throws for missing Payment scheme', () => {
+    expect(() => Challenge.deserialize('Bearer token')).toThrow('Missing Payment scheme.')
   })
 
   test('error: missing required fields', () => {
@@ -351,11 +349,9 @@ describe('fromHeaders', () => {
     expect(challenge.intent).toBe('charge')
   })
 
-  test('error: missing WWW-Authenticate header', () => {
+  test('error: throws for missing WWW-Authenticate header', () => {
     const headers = new Headers()
-    expect(() => Challenge.fromHeaders(headers)).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Missing WWW-Authenticate header]`,
-    )
+    expect(() => Challenge.fromHeaders(headers)).toThrow('Missing WWW-Authenticate header.')
   })
 })
 
@@ -381,18 +377,14 @@ describe('fromResponse', () => {
     expect(challenge.intent).toBe('charge')
   })
 
-  test('error: non-402 status', () => {
+  test('error: throws for non-402 status', () => {
     const response = new Response(null, { status: 401 })
-    expect(() => Challenge.fromResponse(response)).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Expected 402 status, got 401]`,
-    )
+    expect(() => Challenge.fromResponse(response)).toThrow('Response status is not 402.')
   })
 
-  test('error: missing WWW-Authenticate header', () => {
+  test('error: throws for missing WWW-Authenticate header', () => {
     const response = new Response(null, { status: 402 })
-    expect(() => Challenge.fromResponse(response)).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Missing WWW-Authenticate header]`,
-    )
+    expect(() => Challenge.fromResponse(response)).toThrow('Missing WWW-Authenticate header.')
   })
 })
 
