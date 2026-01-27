@@ -4,7 +4,6 @@ import { rpcUrl } from '~test/tempo/prool.js'
 import { accounts, asset, chain } from '~test/tempo/viem.js'
 import * as Challenge from '../Challenge.js'
 import * as Credential from '../Credential.js'
-import * as Receipt from '../Receipt.js'
 import { tempo } from '../tempo/server/Method.js'
 import * as Mpay from './Mpay.js'
 
