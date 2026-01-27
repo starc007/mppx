@@ -18,8 +18,9 @@ export type PaymentHandler<
     string,
     MethodIntent.MethodIntent
   >,
+  context = unknown,
 > = PaymentHandler_core.PaymentHandler<method, intents> & {
-  [intent in keyof intents]: IntentFn<intents[intent]>
+  [intent in keyof intents]: IntentFn<intents[intent], context>
 }
 
 /**
@@ -48,10 +49,22 @@ export type PaymentHandler<
 export function from<
   const method extends string,
   const intents extends Record<string, MethodIntent.MethodIntent>,
->(parameters: from.Parameters<method, intents>): PaymentHandler<method, intents> {
-  const { method, realm, secretKey, intents, verify } = parameters
+  const contextSchema extends z.ZodMiniType | undefined = undefined,
+>(
+  config: from.Config<method, intents, contextSchema> & {
+    verify: VerifyFn<
+      intents,
+      contextSchema extends z.ZodMiniType ? z.output<contextSchema> : Record<never, never>
+    >
+  },
+): PaymentHandler<
+  method,
+  intents,
+  contextSchema extends z.ZodMiniType ? z.input<contextSchema> : Record<never, never>
+> {
+  const { method, realm, secretKey, intents, verify } = config
 
-  const intentFns: Record<string, IntentFn<MethodIntent.MethodIntent>> = {}
+  const intentFns: Record<string, IntentFn<MethodIntent.MethodIntent, Record<string, unknown>>> = {}
   for (const [name, intent] of Object.entries(intents))
     intentFns[name] = createIntentFn({
       intent,
@@ -60,17 +73,20 @@ export function from<
       verify: verify as never,
     })
 
-  return { intents, method, realm, ...intentFns } as PaymentHandler<method, intents>
+  return { intents, method, realm, ...intentFns } as never
 }
 
 export declare namespace from {
-  type Parameters<
+  type Config<
     method extends string = string,
     intents extends Record<string, MethodIntent.MethodIntent> = Record<
       string,
       MethodIntent.MethodIntent
     >,
+    contextSchema extends z.ZodMiniType | undefined = z.ZodMiniType | undefined,
   > = {
+    /** Per-request context. */
+    context?: contextSchema | undefined
     /** Map of intent names to method intents. */
     intents: intents
     /** Payment method name (e.g., "tempo", "stripe"). */
@@ -79,18 +95,18 @@ export declare namespace from {
     realm: string
     /** Secret key for HMAC-bound challenge IDs (required for stateless verification). */
     secretKey: string
-    /** Verify a credential and return a receipt. */
-    verify: VerifyFn<intents>
   }
 }
 
-export type VerifyFn<intents extends Record<string, MethodIntent.MethodIntent>> = (
-  parameters: VerifyFn.Parameters<intents>,
-) => Promise<Receipt.Receipt>
+export type VerifyFn<
+  intents extends Record<string, MethodIntent.MethodIntent>,
+  context = unknown,
+> = (parameters: VerifyFn.Parameters<intents, context>) => Promise<Receipt.Receipt>
 
 export declare namespace VerifyFn {
-  type Parameters<intents extends Record<string, MethodIntent.MethodIntent>> = {
+  type Parameters<intents extends Record<string, MethodIntent.MethodIntent>, context = unknown> = {
     [key in keyof intents]: {
+      context: context
       credential: Credential.Credential<
         z.output<intents[key]['schema']['credential']['payload']>,
         Challenge.Challenge<z.output<intents[key]['schema']['request']>, intents[key]['name']>
@@ -101,13 +117,13 @@ export declare namespace VerifyFn {
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: _
-function createIntentFn<intent extends MethodIntent.MethodIntent>(
-  parameters: createIntentFn.Parameters<intent>,
-): createIntentFn.ReturnType<intent> {
+function createIntentFn<intent extends MethodIntent.MethodIntent, context>(
+  parameters: createIntentFn.Parameters<intent, context>,
+): createIntentFn.ReturnType<intent, context> {
   const { intent, realm, secretKey, verify } = parameters
 
   return (options) => {
-    const { description, expires, request } = options
+    const { description, expires, request, ...context } = options
 
     // Recompute challenge from options. The HMAC-bound ID means we don't need to
     // store challenges server-side—if the client echoes back a credential with
@@ -177,7 +193,7 @@ function createIntentFn<intent extends MethodIntent.MethodIntent>(
       // User-provided verification (e.g., check signature, submit tx, verify payment)
       let receiptData: Receipt.Receipt
       try {
-        receiptData = await verify({ credential, request } as never)
+        receiptData = await verify({ context, credential, request } as never)
       } catch (e) {
         return {
           challenge: Response.requirePayment({
@@ -231,31 +247,31 @@ function createIntentFn<intent extends MethodIntent.MethodIntent>(
 }
 
 declare namespace createIntentFn {
-  type Parameters<intent extends MethodIntent.MethodIntent> = {
+  type Parameters<intent extends MethodIntent.MethodIntent, context> = {
     intent: intent
     realm: string
     secretKey: string
-    verify: VerifyFn<Record<string, intent>>
+    verify: VerifyFn<Record<string, intent>, context>
   }
 
-  type ReturnType<intent extends MethodIntent.MethodIntent> = IntentFn<intent>
+  type ReturnType<intent extends MethodIntent.MethodIntent, context> = IntentFn<intent, context>
 }
 
 /** @internal */
-type IntentFn<intent extends MethodIntent.MethodIntent> = (
-  options: IntentFn.Options<intent>,
+type IntentFn<intent extends MethodIntent.MethodIntent, context> = (
+  options: IntentFn.Options<intent, context>,
 ) => IntentFn.Handler
 
 /** @internal */
 declare namespace IntentFn {
-  export type Options<intent extends MethodIntent.MethodIntent> = {
+  export type Options<intent extends MethodIntent.MethodIntent, context> = {
     /** Optional human-readable description of the payment. */
     description?: string | undefined
     /** Optional challenge expiration timestamp (ISO 8601). */
     expires?: string | undefined
     /** Payment request parameters. */
     request: z.input<intent['schema']['request']>
-  }
+  } & (context extends Record<string, unknown> ? context : Record<never, never>)
 
   export type Handler = FetchFn & NodeFn
 

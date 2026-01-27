@@ -227,14 +227,6 @@ describe('tempo', () => {
     })
 
     test('behavior: fee payer', async () => {
-      const handler = PaymentHandler.tempo({
-        chainId: chain.id,
-        feePayer: accounts[0],
-        realm,
-        rpcUrl,
-        secretKey,
-      })
-
       const request = {
         amount: '1000000',
         currency: asset,
@@ -244,7 +236,7 @@ describe('tempo', () => {
       } as const
 
       const server = await Http.createServer(async (req, res) => {
-        await handler.charge({ request })(req, res)
+        await handler.charge({ feePayer: accounts[0], request })(req, res)
         if (!res.headersSent) res.end('OK')
       })
 
