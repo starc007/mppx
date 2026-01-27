@@ -7,7 +7,7 @@ import * as Method from '../Method.js'
 import * as MethodIntent from '../MethodIntent.js'
 import * as Receipt from '../Receipt.js'
 import * as z from '../zod.js'
-import * as PaymentHandler from './PaymentHandler.js'
+import * as Mpay from './Mpay.js'
 
 const fooCharge = MethodIntent.fromIntent(Intent.charge, {
   method: 'test',
@@ -42,7 +42,7 @@ describe('create', () => {
       },
     })
 
-    const handler = PaymentHandler.create({ method, realm, secretKey })
+    const handler = Mpay.create({ method, realm, secretKey })
 
     expect(handler.method).toBe(method)
     expect(handler.realm).toBe(realm)
@@ -78,7 +78,7 @@ describe('create', () => {
       },
     })
 
-    const handler = PaymentHandler.create({ method, realm, secretKey })
+    const handler = Mpay.create({ method, realm, secretKey })
 
     expect(typeof handler.charge).toBe('function')
     expect(typeof handler.authorize).toBe('function')
@@ -98,7 +98,7 @@ describe('request handler', () => {
       },
     })
 
-    const handler = PaymentHandler.create({ method, realm, secretKey })
+    const handler = Mpay.create({ method, realm, secretKey })
 
     const request = new Request('https://example.com/resource')
 
@@ -149,7 +149,7 @@ describe('request handler', () => {
       headers: { Authorization: 'Payment invalid' },
     })
 
-    const result = await PaymentHandler.create({ method, realm, secretKey }).charge({
+    const result = await Mpay.create({ method, realm, secretKey }).charge({
       request: {
         amount: '1000',
         currency: '0x1234',
@@ -206,7 +206,7 @@ describe('request handler', () => {
       headers: { Authorization: Credential.serialize(credential) },
     })
 
-    const result = await PaymentHandler.create({ method, realm, secretKey }).charge({
+    const result = await Mpay.create({ method, realm, secretKey }).charge({
       request: {
         amount: '1000',
         currency: '0x1234',
@@ -247,7 +247,7 @@ describe('request handler', () => {
       },
     })
 
-    const handle = PaymentHandler.create({ method, realm, secretKey }).charge({
+    const handle = Mpay.create({ method, realm, secretKey }).charge({
       request: {
         amount: '1000',
         currency: '0x1234',
@@ -301,7 +301,7 @@ describe('request handler', () => {
       },
     })
 
-    const handle = PaymentHandler.create({ method, realm, secretKey }).charge({
+    const handle = Mpay.create({ method, realm, secretKey }).charge({
       request: {
         amount: '1000',
         currency: '0x1234',
@@ -359,7 +359,7 @@ describe('request handler', () => {
       },
     })
 
-    const handle = PaymentHandler.create({ method, realm, secretKey }).charge({
+    const handle = Mpay.create({ method, realm, secretKey }).charge({
       request: {
         amount: '1000',
         currency: '0x1234',
@@ -412,7 +412,7 @@ describe('request handler', () => {
       },
     })
 
-    const handle = PaymentHandler.create({ method, realm, secretKey }).charge({
+    const handle = Mpay.create({ method, realm, secretKey }).charge({
       apiKey: 'test-api-key',
       request: {
         amount: '1000',
@@ -456,7 +456,7 @@ describe('request handler (node)', () => {
       },
     })
 
-    const handler = PaymentHandler.create({ method, realm, secretKey })
+    const handler = Mpay.create({ method, realm, secretKey })
 
     const server = await Http.createServer(async (req, res) => {
       await handler.charge({
@@ -505,7 +505,7 @@ describe('request handler (node)', () => {
       },
     })
 
-    const handler = PaymentHandler.create({ method, realm, secretKey })
+    const handler = Mpay.create({ method, realm, secretKey })
     const expires = new Date(Date.now() + 60_000).toISOString()
 
     const server = await Http.createServer(async (req, res) => {

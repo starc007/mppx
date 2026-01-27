@@ -23,9 +23,9 @@ const transferSelector = AbiFunction.getSelector(transfer)
  *
  * @example
  * ```ts
- * import { Method } from 'mpay/server'
+ * import { tempo } from 'mpay/server'
  *
- * const method = Method.tempo({
+ * const method = tempo({
  *   rpcUrl: 'https://rpc.tempo.xyz',
  *   chainId: 42431,
  * })

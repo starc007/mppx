@@ -1,9 +1,9 @@
-import { assertType, describe, expectTypeOf, test } from 'vitest'
+import { describe, expectTypeOf, test } from 'vitest'
 import * as Intent from '../Intent.js'
 import * as Method from '../Method.js'
 import * as MethodIntent from '../MethodIntent.js'
 import * as z from '../zod.js'
-import * as PaymentHandler from './PaymentHandler.js'
+import * as Mpay from './Mpay.js'
 
 const fooCharge = MethodIntent.fromIntent(Intent.charge, {
   method: 'test',
@@ -31,7 +31,7 @@ const fooMethod = Method.from({
   intents: { charge: fooCharge },
 })
 
-describe('PaymentHandler', () => {
+describe('Mpay', () => {
   test('has method and realm properties', () => {
     const method = Method.toServer(fooMethod, {
       async verify() {
@@ -44,7 +44,7 @@ describe('PaymentHandler', () => {
       },
     })
 
-    const handler = PaymentHandler.create({
+    const handler = Mpay.create({
       method,
       realm: 'api.example.com',
       secretKey: 'secret',
@@ -74,7 +74,7 @@ describe('PaymentHandler', () => {
       },
     })
 
-    const handler = PaymentHandler.create({
+    const handler = Mpay.create({
       method,
       realm: 'api.example.com',
       secretKey: 'secret',
@@ -96,7 +96,7 @@ describe('PaymentHandler', () => {
       },
     })
 
-    const handler = PaymentHandler.create({
+    const handler = Mpay.create({
       method,
       realm: 'api.example.com',
       secretKey: 'secret',
@@ -125,7 +125,7 @@ describe('PaymentHandler', () => {
       },
     })
 
-    const handler = PaymentHandler.create({
+    const handler = Mpay.create({
       method,
       realm: 'api.example.com',
       secretKey: 'secret',
@@ -154,7 +154,7 @@ describe('PaymentHandler', () => {
       },
     })
 
-    const handler = PaymentHandler.create({
+    const handler = Mpay.create({
       method,
       realm: 'api.example.com',
       secretKey: 'secret',
@@ -181,7 +181,7 @@ describe('PaymentHandler', () => {
 
 describe('create.Config', () => {
   test('requires method, realm, and secretKey', () => {
-    type Config = PaymentHandler.create.Config
+    type Config = Mpay.create.Config
 
     expectTypeOf<Config>().toHaveProperty('method')
     expectTypeOf<Config>().toHaveProperty('realm')

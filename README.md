@@ -3,22 +3,22 @@
 HTTP Payment Authentication for TypeScript. Implements the ["Payment" HTTP Authentication Scheme](https://datatracker.ietf.org/doc/draft-ietf-httpauth-payment/) with pluggable payment methods & intents.
 
 ```
-Client (PaymentHandler)                             Server (PaymentHandler)
+Client (Mpay)                                     Server (Mpay)
    │                                                   │
    │  (1) GET /resource                                │
    ├──────────────────────────────────────────────────>│
    │                                                   │
-   │             (2) handler.intent(request, { ... })  │
+   │             (2) mpay.intent(request, { ... })     │
    │                   402 + WWW-Authenticate: Payment │
    │<──────────────────────────────────────────────────┤
    │                                                   │
-   │  (3) handler.createCredential(response)           │
+   │  (3) mpay.createCredential(response)              │
    │                                                   │
    │  (4) GET /resource                                │
    │      Authorization: Payment <credential>          │
    ├──────────────────────────────────────────────────>│
    │                                                   │
-   │               (5) handler.verify(request)         │
+   │               (5) intent.verify(request)          │
    │                                                   │
    │               (6) 200 OK                          │
    │                   Payment-Receipt: <receipt>      │
@@ -37,9 +37,9 @@ npm i mpay
 ### Server
 
 ```ts
-import { PaymentHandler, tempo } from 'mpay/server'
+import { Mpay, tempo } from 'mpay/server'
 
-const payment = PaymentHandler.create({
+const payment = Mpay.create({
   method: tempo({
     rpcUrl: 'https://rpc.tempo.xyz',
   }),
@@ -145,10 +145,10 @@ For more control, you can manually create credentials:
 
 ```ts
 import { Challenge } from 'mpay' 
-import { PaymentHandler, tempo } from 'mpay/client'
+import { Mpay, tempo } from 'mpay/client'
 import { privateKeyToAccount } from 'viem/accounts'
 
-const payment = PaymentHandler.create({
+const payment = Mpay.create({
   methods: [
     tempo({
       account: privateKeyToAccount('0x...'),
@@ -416,15 +416,15 @@ const request = Request.deserialize(serialized)
 
 ### Server
 
-#### `PaymentHandler.from`
+#### `Mpay.from`
 
 Creates a server-side payment handler with configured intents.
 
 ```ts
-import { PaymentHandler } from 'mpay/server'
+import { Mpay } from 'mpay/server'
 import { Intents } from 'mpay/tempo'
 
-const payment = PaymentHandler.from({
+const payment = Mpay.from({
   method: 'tempo',
   realm: 'api.example.com',
   secretKey: 'my-secret-key',
@@ -446,16 +446,16 @@ const payment = PaymentHandler.from({
 
 ### Client
 
-#### `PaymentHandler.from`
+#### `Mpay.from`
 
 Defines a client-side payment handler for a payment method.
 
 ```ts
-import { PaymentHandler } from 'mpay/client'
+import { Mpay } from 'mpay/client'
 import { Intents } from 'mpay/tempo'
 
 export function tempo(options: tempo.Options) {
-  return PaymentHandler.from({
+  return Mpay.from({
     method: 'tempo',
     intents: {
       authorize: Intents.authorize,

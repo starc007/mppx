@@ -8,13 +8,13 @@ import { accounts, asset, chain, client } from '~test/tempo/viem.js'
 import * as Challenge from '../../Challenge.js'
 import * as Credential from '../../Credential.js'
 import * as Receipt from '../../Receipt.js'
-import * as PaymentHandler from '../../server/PaymentHandler.js'
+import * as Mpay from '../../server/Mpay.js'
 import { tempo } from './Method.js'
 
 const realm = 'api.example.com'
 const secretKey = 'test-secret-key'
 
-const handler = PaymentHandler.create({
+const handler = Mpay.create({
   method: tempo({
     chainId: chain.id,
     rpcUrl,

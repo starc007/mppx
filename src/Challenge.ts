@@ -144,9 +144,7 @@ export function from<
 }
 
 export declare namespace from {
-  type Options<
-    method extends Method.Method | undefined = undefined,
-  > = {
+  type Options<method extends Method.Method | undefined = undefined> = {
     method?: method
   }
 
@@ -310,9 +308,10 @@ export function serialize(challenge: Challenge): string {
  * @param options - Optional settings to narrow the challenge type.
  * @returns The deserialized challenge.
  */
-export function deserialize<
-  const method extends Method.Method | undefined = undefined,
->(value: string, options?: from.Options<method>): from.ReturnType<from.Parameters, method> {
+export function deserialize<const method extends Method.Method | undefined = undefined>(
+  value: string,
+  options?: from.Options<method>,
+): from.ReturnType<from.Parameters, method> {
   const prefixMatch = value.match(/^Payment\s+(.+)$/i)
   if (!prefixMatch?.[1]) throw new Error('Missing Payment scheme.')
 
@@ -354,9 +353,10 @@ export function deserialize<
  * const challenge = Challenge.fromHeaders(response.headers, { method })
  * ```
  */
-export function fromHeaders<
-  const method extends Method.Method | undefined = undefined,
->(headers: Headers, options?: from.Options<method>): from.ReturnType<from.Parameters, method> {
+export function fromHeaders<const method extends Method.Method | undefined = undefined>(
+  headers: Headers,
+  options?: from.Options<method>,
+): from.ReturnType<from.Parameters, method> {
   const header = headers.get('WWW-Authenticate')
   if (!header) throw new Error('Missing WWW-Authenticate header.')
   return deserialize(header, options)
@@ -381,9 +381,10 @@ export function fromHeaders<
  * const challenge = Challenge.fromResponse(response, { method })
  * ```
  */
-export function fromResponse<
-  const method extends Method.Method | undefined = undefined,
->(response: Response, options?: from.Options<method>): from.ReturnType<from.Parameters, method> {
+export function fromResponse<const method extends Method.Method | undefined = undefined>(
+  response: Response,
+  options?: from.Options<method>,
+): from.ReturnType<from.Parameters, method> {
   if (response.status !== 402) throw new Error('Response status is not 402.')
   return fromHeaders(response.headers, options)
 }

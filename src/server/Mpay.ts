@@ -3,16 +3,16 @@ import type { z } from 'zod/mini'
 import * as Challenge from '../Challenge.js'
 import * as Credential from '../Credential.js'
 import * as Errors from '../Errors.js'
+import type * as Method from '../Method.js'
 import type * as MethodIntent from '../MethodIntent.js'
 import * as Receipt from '../Receipt.js'
-import type * as Method from '../Method.js'
 import * as Request from './Request.js'
 import * as Response from './Response.js'
 
 /**
  * Payment handler.
  */
-export type PaymentHandler<method extends Method.Server<any, any, any> = Method.Server> = {
+export type Mpay<method extends Method.Server<any, any, any> = Method.Server> = {
   /** The payment method. */
   method: method
   /** Server realm (e.g., hostname). */
@@ -29,10 +29,9 @@ export type PaymentHandler<method extends Method.Server<any, any, any> = Method.
  *
  * @example
  * ```ts
- * import { PaymentHandler } from 'mpay/server'
- * import { tempo } from 'mpay/tempo/server'
+ * import { Mpay, tempo } from 'mpay/server'
  *
- * const payment = PaymentHandler.create({
+ * const payment = Mpay.create({
  *   method: tempo({
  *     rpcUrl: 'https://rpc.tempo.xyz',
  *     chainId: 42431,
@@ -44,7 +43,7 @@ export type PaymentHandler<method extends Method.Server<any, any, any> = Method.
  */
 export function create<const method extends Method.Server<any, any, any>>(
   config: create.Config<method>,
-): PaymentHandler<method> {
+): Mpay<method> {
   const { method, realm, secretKey } = config
   const { intents, verify } = method
 
