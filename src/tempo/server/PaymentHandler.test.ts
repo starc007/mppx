@@ -338,7 +338,9 @@ describe('tempo', () => {
         })
         expect(response.status).toBe(402)
         const body = (await response.json()) as { detail: string }
-        expect(body.detail).toContain('Payment verification failed: Invalid transaction: transfer recipient mismatch')
+        expect(body.detail).toContain(
+          'Payment verification failed: Invalid transaction: transfer recipient mismatch',
+        )
       }
 
       server.close()
@@ -389,7 +391,9 @@ describe('tempo', () => {
         })
         expect(response.status).toBe(402)
         const body = (await response.json()) as { detail: string }
-        expect(body.detail).toContain('Payment verification failed: Invalid transaction: unexpected number of calls')
+        expect(body.detail).toContain(
+          'Payment verification failed: Invalid transaction: unexpected number of calls',
+        )
       }
 
       server.close()
@@ -436,7 +440,9 @@ describe('tempo', () => {
         })
         expect(response.status).toBe(402)
         const body = (await response.json()) as { detail: string }
-        expect(body.detail).toContain('Payment verification failed: Invalid transaction: call target does not match currency')
+        expect(body.detail).toContain(
+          'Payment verification failed: Invalid transaction: call target does not match currency',
+        )
       }
 
       server.close()

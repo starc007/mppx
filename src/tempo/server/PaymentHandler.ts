@@ -10,10 +10,9 @@ import {
 import { getTransactionReceipt, sendRawTransactionSync, signTransaction } from 'viem/actions'
 import { tempo as tempo_chain } from 'viem/chains'
 import { Abis, Transaction } from 'viem/tempo'
-
+import type { OneOf } from '../../internal/types.js'
 import * as PaymentHandler from '../../server/PaymentHandler.js'
 import * as Intents from '../Intents.js'
-import type { OneOf } from '../../internal/types.js'
 
 const transfer = AbiFunction.from('function transfer(address to, uint256 amount) returns (bool)')
 const transferSelector = AbiFunction.getSelector(transfer)
