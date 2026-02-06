@@ -34,7 +34,7 @@ const server = http.createServer(async (req, res) => {
     const result = await Mpay.toNodeListener(
       mpay.charge({
         request: {
-          amount: '1000000',
+          amount: '1',
           currency: '0x...',
           recipient: '0x...',
           expires: Expires.minutes(5),
@@ -86,7 +86,7 @@ function paid(
 }
 
 const server = http.createServer(
-  paid({ amount: '1000000', currency: '0x...', recipient: '0x...' }, (req, res) => {
+  paid({ amount: '1', currency: '0x...', recipient: '0x...' }, (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ fortune: 'You will be rich' }))
   }),

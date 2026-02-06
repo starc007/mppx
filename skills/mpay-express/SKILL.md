@@ -36,7 +36,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }))
 app.get('/fortune', async (req, res) => {
   const result = await mpay.charge({
     request: {
-      amount: '1000000',
+      amount: '1',
       currency: '0x...',
       recipient: '0x...',
       expires: Expires.minutes(5),
@@ -114,7 +114,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }))
 
 app.get(
   '/fortune',
-  paid({ amount: '1000000', currency: '0x...', recipient: '0x...' }),
+  paid({ amount: '1', currency: '0x...', recipient: '0x...' }),
   (req, res) => res.json({ fortune: 'You will be rich' }),
 )
 

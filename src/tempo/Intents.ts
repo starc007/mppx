@@ -28,7 +28,7 @@ export const charge = MethodIntent.fromIntent(Intent.charge, {
         ),
         memo: z.optional(z.hash()),
       }),
-      requires: ['recipient'],
+      requires: ['decimals', 'recipient'],
     },
   },
 })

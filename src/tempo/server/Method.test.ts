@@ -32,7 +32,7 @@ describe('tempo', () => {
   describe('intent: charge; type: hash', () => {
     test('default', async () => {
       const httpServer = await Http.createServer(async (req, res) => {
-        const result = await toNodeListener(server.charge({ amount: '1000000' }))(req, res)
+        const result = await toNodeListener(server.charge({ amount: '1', decimals: 6 }))(req, res)
         if (result.status === 402) return
         res.end('OK')
       })
@@ -88,7 +88,7 @@ describe('tempo', () => {
       const httpServer = await Http.createServer(async (req, res) => {
         const result = await toNodeListener(
           server.charge({
-            amount: '1000000',
+            amount: '1',
             currency: overrideCurrency,
             expires: overrideExpires,
             recipient: overrideRecipient,
@@ -136,7 +136,7 @@ describe('tempo', () => {
       const wrongRecipient = accounts[2].address
 
       const httpServer = await Http.createServer(async (req, res) => {
-        const result = await toNodeListener(server.charge({ amount: '1000000' }))(req, res)
+        const result = await toNodeListener(server.charge({ amount: '1' }))(req, res)
         if (result.status === 402) return
         res.end('OK')
       })
@@ -174,7 +174,7 @@ describe('tempo', () => {
       const httpServer = await Http.createServer(async (req, res) => {
         const result = await toNodeListener(
           server.charge({
-            amount: '1000000',
+            amount: '1',
             expires: new Date(Date.now() - 1000).toISOString(),
           }),
         )(req, res)
@@ -216,7 +216,7 @@ describe('tempo', () => {
         try {
           const result = await toNodeListener(
             server.charge({
-              amount: '1000000',
+              amount: '1',
               chainId: 999999,
             }),
           )(req, res)
@@ -252,7 +252,7 @@ describe('tempo', () => {
       const httpServer = await Http.createServer(async (req, res) => {
         const result = await toNodeListener(
           server.charge({
-            amount: '1000000',
+            amount: '1',
             currency: asset,
             recipient: accounts[0].address,
           }),
@@ -307,7 +307,7 @@ describe('tempo', () => {
       const httpServer = await Http.createServer(async (req, res) => {
         const result = await toNodeListener(
           server.charge({
-            amount: '1000000',
+            amount: '1',
             currency: overrideCurrency,
             expires: overrideExpires,
             recipient: overrideRecipient,
@@ -351,7 +351,7 @@ describe('tempo', () => {
         const result = await toNodeListener(
           server.charge({
             feePayer: accounts[0],
-            amount: '1000000',
+            amount: '1',
             currency: asset,
             recipient: accounts[0].address,
           }),
@@ -413,7 +413,7 @@ describe('tempo', () => {
       const httpServer = await Http.createServer(async (req, res) => {
         const result = await toNodeListener(
           server.charge({
-            amount: '1000000',
+            amount: '1',
             currency: asset,
             recipient: accounts[0].address,
           }),
@@ -474,7 +474,7 @@ describe('tempo', () => {
       const httpServer = await Http.createServer(async (req, res) => {
         const result = await toNodeListener(
           server.charge({
-            amount: '1000000',
+            amount: '1',
             chainId: chain.id,
           }),
         )(req, res)
@@ -506,7 +506,7 @@ describe('tempo', () => {
       const httpServer = await Http.createServer(async (req, res) => {
         const result = await toNodeListener(
           server.charge({
-            amount: '1000000',
+            amount: '1',
             expires: new Date(Date.now() + 60_000).toISOString(),
           }),
         )(req, res)

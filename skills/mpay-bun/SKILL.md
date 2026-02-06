@@ -31,7 +31,7 @@ Bun.serve({
     if (url.pathname === '/fortune') {
       const result = await mpay.charge({
         request: {
-          amount: '1000000',
+          amount: '1',
           currency: '0x...',
           recipient: '0x...',
           expires: Expires.minutes(5),
@@ -77,7 +77,7 @@ function paid(
 }
 
 const fortuneHandler = paid(
-  { amount: '1000000', currency: '0x...', recipient: '0x...' },
+  { amount: '1', currency: '0x...', recipient: '0x...' },
   () => Response.json({ fortune: 'You will be rich' }),
 )
 

@@ -15,6 +15,7 @@ const challenge = Challenge.fromIntent(Intents.charge, {
   request: {
     amount: '1000',
     currency: '0x20c0000000000000000000000000000000000001',
+    decimals: 6,
     recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
     expires: '2025-01-01T00:00:00.000Z',
   },
@@ -43,12 +44,13 @@ describe('http', () => {
       expect(transport.getCredential(request)).toMatchInlineSnapshot(`
         {
           "challenge": {
-            "id": "4a55RMtPVF5Gvy4MgfQ7V9kd6HV4DsjD03YvnUuQaVQ",
+            "expires": "2025-01-01T00:00:00.000Z",
+            "id": "jIuTUdphF_TyhJ-NT1lK2r5YzPXw4tuELfslOVa3nls",
             "intent": "charge",
             "method": "tempo",
             "realm": "api.example.com",
             "request": {
-              "amount": "1000",
+              "amount": "1000000000",
               "currency": "0x20c0000000000000000000000000000000000001",
               "expires": "2025-01-01T00:00:00.000Z",
               "recipient": "0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00",
@@ -93,7 +95,7 @@ describe('http', () => {
         {
           "headers": {
             "cache-control": "no-store",
-            "www-authenticate": "Payment id="4a55RMtPVF5Gvy4MgfQ7V9kd6HV4DsjD03YvnUuQaVQ", realm="api.example.com", method="tempo", intent="charge", request="eyJhbW91bnQiOiIxMDAwIiwiY3VycmVuY3kiOiIweDIwYzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJleHBpcmVzIjoiMjAyNS0wMS0wMVQwMDowMDowMC4wMDBaIiwicmVjaXBpZW50IjoiMHg3NDJkMzVDYzY2MzRDMDUzMjkyNWEzYjg0NEJjOWU3NTk1ZjhmRTAwIn0"",
+            "www-authenticate": "Payment id="jIuTUdphF_TyhJ-NT1lK2r5YzPXw4tuELfslOVa3nls", realm="api.example.com", method="tempo", intent="charge", request="eyJjdXJyZW5jeSI6IjB4MjBjMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsImV4cGlyZXMiOiIyMDI1LTAxLTAxVDAwOjAwOjAwLjAwMFoiLCJyZWNpcGllbnQiOiIweDc0MmQzNUNjNjYzNEMwNTMyOTI1YTNiODQ0QmM5ZTc1OTVmOGZFMDAiLCJhbW91bnQiOiIxMDAwMDAwMDAwIn0", expires="2025-01-01T00:00:00.000Z"",
           },
           "status": 402,
         }
@@ -154,12 +156,13 @@ describe('mcp', () => {
       expect(transport.getCredential(request)).toMatchInlineSnapshot(`
         {
           "challenge": {
-            "id": "4a55RMtPVF5Gvy4MgfQ7V9kd6HV4DsjD03YvnUuQaVQ",
+            "expires": "2025-01-01T00:00:00.000Z",
+            "id": "jIuTUdphF_TyhJ-NT1lK2r5YzPXw4tuELfslOVa3nls",
             "intent": "charge",
             "method": "tempo",
             "realm": "api.example.com",
             "request": {
-              "amount": "1000",
+              "amount": "1000000000",
               "currency": "0x20c0000000000000000000000000000000000001",
               "expires": "2025-01-01T00:00:00.000Z",
               "recipient": "0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00",
@@ -191,12 +194,13 @@ describe('mcp', () => {
             "data": {
               "challenges": [
                 {
-                  "id": "4a55RMtPVF5Gvy4MgfQ7V9kd6HV4DsjD03YvnUuQaVQ",
+                  "expires": "2025-01-01T00:00:00.000Z",
+                  "id": "jIuTUdphF_TyhJ-NT1lK2r5YzPXw4tuELfslOVa3nls",
                   "intent": "charge",
                   "method": "tempo",
                   "realm": "api.example.com",
                   "request": {
-                    "amount": "1000",
+                    "amount": "1000000000",
                     "currency": "0x20c0000000000000000000000000000000000001",
                     "expires": "2025-01-01T00:00:00.000Z",
                     "recipient": "0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00",
@@ -232,7 +236,7 @@ describe('mcp', () => {
           "result": {
             "_meta": {
               "org.paymentauth/receipt": {
-                "challengeId": "4a55RMtPVF5Gvy4MgfQ7V9kd6HV4DsjD03YvnUuQaVQ",
+                "challengeId": "jIuTUdphF_TyhJ-NT1lK2r5YzPXw4tuELfslOVa3nls",
                 "method": "tempo",
                 "reference": "0xtxhash",
                 "status": "success",

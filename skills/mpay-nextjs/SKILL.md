@@ -24,7 +24,7 @@ const mpay = Mpay.create({
 export async function GET(request: Request) {
   const result = await mpay.charge({
     request: {
-      amount: '1000000',
+      amount: '1',
       currency: '0x...',
       recipient: '0x...',
       expires: Expires.minutes(5),
@@ -78,7 +78,7 @@ export function paid(
 import { paid } from '@/lib/mpay'
 
 export const GET = paid(
-  { amount: '1000000', currency: '0x...', recipient: '0x...' },
+  { amount: '1', currency: '0x...', recipient: '0x...' },
   async () => Response.json({ fortune: 'You will be rich' }),
 )
 ```
@@ -92,7 +92,7 @@ import type { NextRequest } from 'next/server'
 import { mpay } from '@/lib/mpay'
 
 const prices: Record<string, string> = {
-  '/api/fortune': '1000000',
+  '/api/fortune': '1',
   '/api/premium': '5000000',
 }
 

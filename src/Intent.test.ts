@@ -6,8 +6,9 @@ describe('charge', () => {
     const result = Intent.charge.schema.request.parse({
       amount: '1000',
       currency: 'USD',
+      decimals: 6,
     })
-    expect(result.amount).toBe('1000')
+    expect(result.amount).toBe('1000000000')
     expect(result.currency).toBe('USD')
     expect(result.expires).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
   })
@@ -17,6 +18,7 @@ describe('charge', () => {
       Intent.charge.schema.request.parse({
         amount: '1000',
         currency: 'USD',
+        decimals: 6,
         description: 'Test payment',
         expires: '2030-01-01T00:00:00Z',
         externalId: 'order-123',
@@ -24,7 +26,7 @@ describe('charge', () => {
       }),
     ).toMatchInlineSnapshot(`
       {
-        "amount": "1000",
+        "amount": "1000000000",
         "currency": "USD",
         "description": "Test payment",
         "expires": "2030-01-01T00:00:00Z",
@@ -46,11 +48,19 @@ describe('charge', () => {
           "origin": "string",
           "code": "invalid_format",
           "format": "regex",
-          "pattern": "/^\\\\d+$/",
+          "pattern": "/^\\\\d+(\\\\.\\\\d+)?$/",
           "path": [
             "amount"
           ],
           "message": "Invalid amount"
+        },
+        {
+          "expected": "number",
+          "code": "invalid_type",
+          "path": [
+            "decimals"
+          ],
+          "message": "Invalid input"
         }
       ]]
     `)
@@ -65,14 +75,12 @@ describe('charge', () => {
     ).toThrowErrorMatchingInlineSnapshot(`
       [$ZodError: [
         {
-          "origin": "string",
-          "code": "invalid_format",
-          "format": "regex",
-          "pattern": "/^\\\\d+$/",
+          "expected": "number",
+          "code": "invalid_type",
           "path": [
-            "amount"
+            "decimals"
           ],
-          "message": "Invalid amount"
+          "message": "Invalid input"
         }
       ]]
     `)
@@ -87,6 +95,14 @@ describe('charge', () => {
       }),
     ).toThrowErrorMatchingInlineSnapshot(`
       [$ZodError: [
+        {
+          "expected": "number",
+          "code": "invalid_type",
+          "path": [
+            "decimals"
+          ],
+          "message": "Invalid input"
+        },
         {
           "origin": "string",
           "code": "invalid_format",

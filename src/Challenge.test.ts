@@ -62,7 +62,7 @@ describe('from', () => {
       secretKey: 'my-secret',
     })
 
-    expect(challenge.id).toMatchInlineSnapshot(`"MIY9fLzP6JPHRY5LGkXJHaa7QF8f5fD61bpO6-uTgK0"`)
+    expect(challenge.id).toMatchInlineSnapshot(`"okjPWig-KcWGvMWYEMdA_oVwySaHKV2q3D1po2xUXI4"`)
     expect(challenge.realm).toBe('api.example.com')
     expect(challenge.method).toBe('tempo')
   })
@@ -112,8 +112,9 @@ describe('fromIntent', () => {
       id: 'abc123',
       realm: 'api.example.com',
       request: {
-        amount: '1000000',
+        amount: '1',
         currency: '0x20c0000000000000000000000000000000000001',
+        decimals: 6,
         recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
         expires: '2025-01-06T12:00:00Z',
       },
@@ -121,6 +122,7 @@ describe('fromIntent', () => {
 
     expect(challenge).toMatchInlineSnapshot(`
       {
+        "expires": "2025-01-06T12:00:00Z",
         "id": "abc123",
         "intent": "charge",
         "method": "tempo",
@@ -140,8 +142,9 @@ describe('fromIntent', () => {
       id: 'abc123',
       realm: 'api.example.com',
       request: {
-        amount: '1000000',
+        amount: '1',
         currency: '0x20c0000000000000000000000000000000000001',
+        decimals: 6,
         recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
         expires: '2025-01-06T12:00:00Z',
         chainId: 42431,
@@ -151,6 +154,7 @@ describe('fromIntent', () => {
 
     expect(challenge).toMatchInlineSnapshot(`
       {
+        "expires": "2025-01-06T12:00:00Z",
         "id": "abc123",
         "intent": "charge",
         "method": "tempo",
@@ -174,8 +178,9 @@ describe('fromIntent', () => {
       id: 'abc123',
       realm: 'api.example.com',
       request: {
-        amount: '1000000',
+        amount: '1',
         currency: '0x20c0000000000000000000000000000000000001',
+        decimals: 6,
         recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
         expires: '2025-01-06T12:00:00Z',
       },
@@ -191,8 +196,9 @@ describe('fromIntent', () => {
     const challenge = Challenge.fromIntent(Intents.charge, {
       realm: 'api.example.com',
       request: {
-        amount: '1000000',
+        amount: '1',
         currency: '0x20c0000000000000000000000000000000000001',
+        decimals: 6,
         recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
         expires: '2025-01-06T12:00:00Z',
       },

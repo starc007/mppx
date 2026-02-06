@@ -65,6 +65,7 @@ describe('createCredential', () => {
       request: {
         amount: '1000',
         currency: '0x1234567890123456789012345678901234567890',
+        decimals: 6,
         recipient: '0x1234567890123456789012345678901234567890',
         expires: new Date(Date.now() + 60_000).toISOString(),
       },
@@ -166,6 +167,7 @@ describe('createCredential', () => {
       request: {
         amount: '1000',
         currency: '0x1234567890123456789012345678901234567890',
+        decimals: 6,
         recipient: '0x1234567890123456789012345678901234567890',
         expires: new Date(Date.now() + 60_000).toISOString(),
       },
@@ -194,6 +196,7 @@ describe('createCredential', () => {
       request: {
         amount: '1000',
         currency: '0x1234567890123456789012345678901234567890',
+        decimals: 6,
         recipient: '0x1234567890123456789012345678901234567890',
         expires: new Date(Date.now() + 60_000).toISOString(),
       },
@@ -220,6 +223,7 @@ describe('createCredential', () => {
       request: {
         amount: '1000',
         currency: '0x1234567890123456789012345678901234567890',
+        decimals: 6,
         recipient: '0x1234567890123456789012345678901234567890',
         expires: new Date(Date.now() + 60_000).toISOString(),
       },

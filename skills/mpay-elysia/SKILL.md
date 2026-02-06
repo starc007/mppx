@@ -28,7 +28,7 @@ app.get('/health', () => ({ status: 'ok' }))
 app.get('/fortune', async ({ request }) => {
   const result = await mpay.charge({
     request: {
-      amount: '1000000',
+      amount: '1',
       currency: '0x...',
       recipient: '0x...',
       expires: Expires.minutes(5),
@@ -67,7 +67,7 @@ function paid(config: { amount: string; currency: string; recipient: string }) {
 
 const app = new Elysia()
   .get('/health', () => ({ status: 'ok' }))
-  .use(paid({ amount: '1000000', currency: '0x...', recipient: '0x...' }))
+  .use(paid({ amount: '1', currency: '0x...', recipient: '0x...' }))
   .get('/fortune', () => ({ fortune: 'You will be rich' }))
   .listen(3000)
 ```

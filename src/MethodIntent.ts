@@ -1,4 +1,4 @@
-import type * as Intent from './Intent.js'
+import * as Intent from './Intent.js'
 import * as z from './zod.js'
 
 /**
@@ -83,7 +83,7 @@ export function fromIntent<
   const { name } = intent
   const { method, schema } = options
 
-  const requestShape = intent.schema.request.shape as Record<string, z.ZodMiniType>
+  const requestShape = Intent.shapeOf(intent) as Record<string, z.ZodMiniType>
 
   const methodDetails = schema.request?.methodDetails
   const requires = schema.request?.requires ?? []
@@ -103,18 +103,24 @@ export function fromIntent<
       methodDetailsKeys.push(key)
     }
 
+  const intentRequest = intent.schema.request
+  const hasPipe = !('shape' in intentRequest)
+
   const request = z.pipe(
     z.object(requestInputShape),
     z.transform((input: Record<string, unknown>) => {
-      if (methodDetailsKeys.length === 0) return input
+      const transformed = hasPipe ? (intentRequest as z.ZodMiniType).parse(input) : input
 
       const result: Record<string, unknown> = {}
       const details: Record<string, unknown> = {}
 
-      for (const [key, value] of Object.entries(input)) {
-        if (methodDetailsKeys.includes(key)) {
-          if (value !== undefined) details[key] = value
-        } else result[key] = value
+      for (const [key, value] of Object.entries(transformed as Record<string, unknown>)) {
+        result[key] = value
+      }
+
+      for (const key of methodDetailsKeys) {
+        const value = input[key]
+        if (value !== undefined) details[key] = value
       }
 
       if (Object.keys(details).length > 0) result.methodDetails = details
@@ -140,7 +146,7 @@ export namespace fromIntent {
       request?:
         | {
             methodDetails?: z.ZodMiniObject | undefined
-            requires?: ReadonlyArray<keyof z.input<intent['schema']['request']>> | undefined
+            requires?: readonly (keyof Intent.ShapeOf<intent>)[] | undefined
           }
         | undefined
     }
@@ -151,39 +157,39 @@ export namespace fromIntent {
 type RequiresKeys<
   intent extends Intent.Intent,
   options extends fromIntent.Options<intent>,
-> = options['schema']['request'] extends { requires: ReadonlyArray<infer K> } ? K : never
+> = options['schema']['request'] extends { requires: readonly (infer key)[] } ? key : never
 
 /** @internal */
-type UnwrapOptional<T> = T extends z.ZodMiniOptional<infer U> ? U : T
+type UnwrapOptional<schema> = schema extends z.ZodMiniOptional<infer inner> ? inner : schema
 
 /** @internal */
 type MethodDetailsShape<
   intent extends Intent.Intent,
   options extends fromIntent.Options<intent>,
-> = options['schema']['request'] extends { methodDetails: infer M extends z.ZodMiniObject }
-  ? M['shape']
+> = options['schema']['request'] extends { methodDetails: infer details extends z.ZodMiniObject }
+  ? details['shape']
   : Record<never, never>
 
 /** @internal */
 type InputRequestShape<intent extends Intent.Intent, options extends fromIntent.Options<intent>> = {
-  [K in keyof intent['schema']['request']['shape']]: K extends RequiresKeys<intent, options>
-    ? UnwrapOptional<intent['schema']['request']['shape'][K]>
-    : intent['schema']['request']['shape'][K]
+  [K in keyof Intent.ShapeOf<intent>]: K extends RequiresKeys<intent, options>
+    ? UnwrapOptional<Intent.ShapeOf<intent>[K]>
+    : Intent.ShapeOf<intent>[K]
 } & MethodDetailsShape<intent, options>
 
 /** @internal */
 type MethodDetailsOutput<
   intent extends Intent.Intent,
   options extends fromIntent.Options<intent>,
-> = options['schema']['request'] extends { methodDetails: infer M extends z.ZodMiniObject }
-  ? { methodDetails?: z.output<M> }
+> = options['schema']['request'] extends { methodDetails: infer details extends z.ZodMiniObject }
+  ? { methodDetails?: z.output<details> }
   : Record<never, never>
 
 /** @internal */
 type OutputRequestType<intent extends Intent.Intent, options extends fromIntent.Options<intent>> = {
-  [K in keyof intent['schema']['request']['shape']]: K extends RequiresKeys<intent, options>
-    ? z.output<UnwrapOptional<intent['schema']['request']['shape'][K]>>
-    : z.output<intent['schema']['request']['shape'][K]>
+  [K in keyof Intent.ShapeOf<intent>]: K extends RequiresKeys<intent, options>
+    ? z.output<UnwrapOptional<Intent.ShapeOf<intent>[K]>>
+    : z.output<Intent.ShapeOf<intent>[K]>
 } & MethodDetailsOutput<intent, options>
 
 /** @internal */

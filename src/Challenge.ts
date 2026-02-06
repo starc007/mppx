@@ -117,17 +117,12 @@ export function from<
   const method extends Method.Method | undefined = undefined,
 >(parameters: parameters, options?: from.Options<method>): from.ReturnType<parameters, method> {
   void options
-  const {
-    description,
-    digest,
-    expires,
-    method: methodName,
-    intent,
-    realm,
-    request,
-    secretKey,
-  } = parameters
-  const id = secretKey ? computeId(parameters, { secretKey }) : (parameters as { id: string }).id
+  const { description, digest, method: methodName, intent, realm, request, secretKey } = parameters
+
+  const expires = (parameters.expires ?? request.expires) as string
+  const id = secretKey
+    ? computeId({ ...parameters, expires }, { secretKey })
+    : (parameters as { id: string }).id
 
   return Schema.parse({
     id,
@@ -422,7 +417,9 @@ function computeId(challenge: Omit<Challenge, 'id'>, options: { secretKey: strin
     PaymentRequest.serialize(challenge.request),
     challenge.expires ?? '',
     challenge.digest ?? '',
-  ].join('|')
+  ]
+    .filter(Boolean)
+    .join('|')
 
   const key = Bytes.fromString(options.secretKey)
   const data = Bytes.fromString(input)

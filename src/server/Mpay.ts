@@ -208,12 +208,12 @@ function createIntentFn(parameters: createIntentFn.Parameters): createIntentFn.R
 
       return {
         status: 200,
-        withReceipt<T>(response: T) {
+        withReceipt<response>(response: response) {
           return transport.respondReceipt({
             receipt: receiptData,
             response: response as never,
             challengeId: credential.challenge.id,
-          }) as T
+          }) as response
         },
       }
     }
@@ -266,7 +266,7 @@ declare namespace IntentFn {
     | { challenge: Transport.ChallengeOutputOf<transport>; status: 402 }
     | {
         status: 200
-        withReceipt: <T>(response: T) => T
+        withReceipt: <response>(response: response) => response
       }
 }
 

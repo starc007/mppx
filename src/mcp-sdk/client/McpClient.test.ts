@@ -42,7 +42,7 @@ describe('McpClient.wrap', () => {
       { description: 'A tool that requires payment' },
       async (extra) => {
         const result = await mpayServer.charge({
-          amount: '1000000',
+          amount: '1',
           currency: asset,
           expires: new Date(Date.now() + 60_000).toISOString(),
           recipient: accounts[0].address,
@@ -160,8 +160,9 @@ describe('McpClient.wrap', () => {
         realm,
         secretKey,
         request: {
-          amount: '1000000',
+          amount: '1',
           currency: asset,
+          decimals: 6,
           expires: new Date(Date.now() + 60_000).toISOString(),
           recipient: accounts[0].address,
         },

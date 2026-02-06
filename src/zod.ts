@@ -2,9 +2,9 @@ import { type ZodMiniOptional, type ZodMiniType, z } from 'zod/mini'
 
 export * from 'zod/mini'
 
-/** Numeric string (base unit amount). */
+/** Numeric string amount (e.g., "1", "1.5", "1000000"). */
 export function amount() {
-  return z.string().check(z.regex(/^\d+$/, 'Invalid amount'))
+  return z.string().check(z.regex(/^\d+(\.\d+)?$/, 'Invalid amount'))
 }
 
 /** ISO 8601 datetime string (e.g., "2025-01-06T12:00:00Z"). */
@@ -40,7 +40,7 @@ export function signature() {
 }
 
 /** Checks if a schema is optional and returns the inner type if so. */
-export function unwrapOptional<T extends ZodMiniType>(schema: T): ZodMiniType {
+export function unwrapOptional<schema extends ZodMiniType>(schema: schema): ZodMiniType {
   if (schema._zod.def.type === 'optional')
     return (schema as unknown as ZodMiniOptional)._zod.def.innerType as ZodMiniType
   return schema

@@ -17,8 +17,9 @@ describe('charge', () => {
 
   test('schema: validates valid request', () => {
     const result = charge.schema.request.safeParse({
-      amount: '1000000',
+      amount: '1',
       currency: '0x20c0000000000000000000000000000000000001',
+      decimals: 6,
       expires: '2025-02-05T12:05:00Z',
       recipient: '0x1234567890abcdef1234567890abcdef12345678',
     })
@@ -27,10 +28,12 @@ describe('charge', () => {
 
   test('schema: validates request with methodDetails', () => {
     const result = charge.schema.request.safeParse({
-      amount: '1000000',
+      amount: '1',
       currency: '0x20c0000000000000000000000000000000000001',
+      decimals: 6,
       expires: '2025-02-05T12:05:00Z',
-      methodDetails: { chainId: 42431, feePayer: true },
+      chainId: 42431,
+      feePayer: true,
       recipient: '0x1234567890abcdef1234567890abcdef12345678',
     })
     expect(result.success).toBe(true)
@@ -38,8 +41,9 @@ describe('charge', () => {
 
   test('schema: validates request with memo', () => {
     const result = charge.schema.request.safeParse({
-      amount: '1000000',
+      amount: '1',
       currency: '0x20c0000000000000000000000000000000000001',
+      decimals: 6,
       expires: '2025-02-05T12:05:00Z',
       memo: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
       recipient: '0x1234567890abcdef1234567890abcdef12345678',
@@ -49,7 +53,7 @@ describe('charge', () => {
 
   test('schema: rejects invalid request', () => {
     const result = charge.schema.request.safeParse({
-      amount: '1000000',
+      amount: '1',
     })
     expect(result.success).toBe(false)
   })

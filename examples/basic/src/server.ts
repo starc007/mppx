@@ -22,7 +22,7 @@ export async function handler(request: Request): Promise<Response | null> {
   // Paid
   if (url.pathname === '/api/fortune') {
     const result = await mpay.charge({
-      amount: '1000000', // 1 USD
+      amount: '1', // 1 USD
       description: 'Fortune for you',
       currency,
       expires: Expires.minutes(5),

@@ -22,8 +22,9 @@ describe('from', () => {
 describe('fromIntent', () => {
   test('creates a validated request from intent', () => {
     const request = PaymentRequest.fromIntent(Intents.charge, {
-      amount: '1000000',
+      amount: '1',
       currency: '0x20c0000000000000000000000000000000000001',
+      decimals: 6,
       recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
       expires: '2025-01-06T12:00:00Z',
     })
@@ -39,8 +40,9 @@ describe('fromIntent', () => {
 
   test('includes methodDetails fields', () => {
     const request = PaymentRequest.fromIntent(Intents.charge, {
-      amount: '1000000',
+      amount: '1',
       currency: '0x20c0000000000000000000000000000000000001',
+      decimals: 6,
       recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
       expires: '2025-01-06T12:00:00Z',
       chainId: 42431,
@@ -73,6 +75,14 @@ describe('fromIntent', () => {
           "code": "invalid_type",
           "path": [
             "amount"
+          ],
+          "message": "Invalid input"
+        },
+        {
+          "expected": "number",
+          "code": "invalid_type",
+          "path": [
+            "decimals"
           ],
           "message": "Invalid input"
         }

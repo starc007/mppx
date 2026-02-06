@@ -34,7 +34,7 @@ describe('Fetch.from', () => {
     const httpServer = await Http.createServer(async (req, res) => {
       const result = await toNodeListener(
         server.charge({
-          amount: '1000000',
+          amount: '1',
           currency: asset,
           expires: new Date(Date.now() + 60_000).toISOString(),
           recipient: accounts[0].address,
@@ -76,7 +76,7 @@ describe('Fetch.from', () => {
     const httpServer = await Http.createServer(async (req, res) => {
       const result = await toNodeListener(
         server.charge({
-          amount: '1000000',
+          amount: '1',
           currency: asset,
           expires: new Date(Date.now() + 60_000).toISOString(),
           recipient: accounts[0].address,
@@ -110,7 +110,7 @@ describe('Fetch.from', () => {
     const httpServer = await Http.createServer(async (req, res) => {
       const result = await toNodeListener(
         server.charge({
-          amount: '1000000',
+          amount: '1',
           currency: asset,
           expires: new Date(Date.now() + 60_000).toISOString(),
           recipient: accounts[0].address,
@@ -140,7 +140,7 @@ describe('Fetch.from', () => {
     const httpServer = await Http.createServer(async (req, res) => {
       const result = await toNodeListener(
         server.charge({
-          amount: '1000000',
+          amount: '1',
           currency: asset,
           expires: new Date(Date.now() + 60_000).toISOString(),
           recipient: accounts[0].address,
@@ -201,7 +201,7 @@ describe('Fetch.from', () => {
     const httpServer = await Http.createServer(async (req, res) => {
       const result = await toNodeListener(
         serverWithFeePayer.charge({
-          amount: '1000000',
+          amount: '1',
           currency: asset,
           expires: new Date(Date.now() + 60_000).toISOString(),
           recipient: accounts[0].address,
@@ -246,7 +246,7 @@ describe('Fetch.polyfill', () => {
     const httpServer = await Http.createServer(async (req, res) => {
       const result = await toNodeListener(
         server.charge({
-          amount: '1000000',
+          amount: '1',
           currency: asset,
           expires: new Date(Date.now() + 60_000).toISOString(),
           recipient: accounts[0].address,

@@ -95,6 +95,7 @@ describe('Mpay', () => {
     handler.charge({
       amount: '1000',
       currency: '0x1234',
+      decimals: 6,
       expires: '2025-01-01T00:00:00Z',
       recipient: '0xabc',
     })
@@ -121,6 +122,7 @@ describe('Mpay', () => {
     const chargeHandler = handler.charge({
       amount: '1000',
       currency: '0x1234',
+      decimals: 6,
       expires: '2025-01-01T00:00:00Z',
       recipient: '0xabc',
     })
@@ -145,12 +147,14 @@ describe('Mpay', () => {
       // currency and recipient should be optional since they're in defaults
       handler.charge({
         amount: '1000',
+        decimals: 6,
       })
 
       // But can still be overridden
       handler.charge({
         amount: '1000',
         currency: '0x5678',
+        decimals: 6,
         recipient: '0xdef',
       })
     })
@@ -165,6 +169,7 @@ describe('Mpay', () => {
       // recipient is still required since it's not in defaults
       handler.charge({
         amount: '1000',
+        decimals: 6,
         recipient: '0xabc',
       })
     })
@@ -180,6 +185,7 @@ describe('Mpay', () => {
       handler.charge({
         amount: '1000',
         currency: '0x1234',
+        decimals: 6,
         recipient: '0xabc',
       })
     })

@@ -38,7 +38,7 @@ const transferWithMemoSelector = /*#__PURE__*/ AbiFunction.getSelector(transferW
 export function tempo<const defaults extends tempo.Defaults>(
   parameters: tempo.Parameters<defaults> = {} as tempo.Parameters<defaults>,
 ) {
-  const { amount, currency, description, externalId, memo, recipient } = parameters
+  const { amount, currency, decimals = 6, description, externalId, memo, recipient } = parameters
 
   const rpcUrl = parameters.rpcUrl ?? defaults.rpcUrl
 
@@ -58,15 +58,17 @@ export function tempo<const defaults extends tempo.Defaults>(
     })
   }
 
-  return Method.toServer<typeof Methods.tempo, defaults>(Methods.tempo, {
+  type Defaults = defaults & { decimals: number }
+  return Method.toServer<typeof Methods.tempo, Defaults>(Methods.tempo, {
     defaults: {
       amount,
       currency,
+      decimals,
       description,
       externalId,
       memo,
       recipient,
-    } as defaults,
+    } as Defaults,
 
     request({ credential, request }) {
       const chainId = (() => {
