@@ -1,20 +1,10 @@
+import { Challenge, Credential, Intent, Mcp, MethodIntent, Receipt } from 'mpay'
+import { Mpay, Transport, tempo } from 'mpay/client'
+import { Mpay as Mpay_server, tempo as tempo_server } from 'mpay/server'
+import { MethodIntents } from 'mpay/tempo'
 import { afterEach, describe, expect, test } from 'vitest'
 import * as Http from '~test/Http.js'
 import { accounts, asset, client } from '~test/tempo/viem.js'
-import * as Challenge from '../Challenge.js'
-import * as Credential from '../Credential.js'
-import * as Intent from '../Intent.js'
-import * as Mcp from '../Mcp.js'
-import * as MethodIntent from '../MethodIntent.js'
-import * as Receipt from '../Receipt.js'
-import * as Mpay_server from '../server/Mpay.js'
-import { toNodeListener } from '../server/Mpay.js'
-import { charge as charge_client } from '../tempo/client/Charge.js'
-import { tempo } from '../tempo/client/index.js'
-import * as Intents from '../tempo/Intents.js'
-import { charge as charge_server } from '../tempo/server/Charge.js'
-import * as Mpay from './Mpay.js'
-import * as Transport from './Transport.js'
 
 const realm = 'api.example.com'
 const secretKey = 'test-secret-key'
@@ -55,7 +45,7 @@ describe('Mpay.create', () => {
       method: 'stripe',
       schema: {
         credential: {
-          payload: Intents.charge.schema.credential.payload,
+          payload: MethodIntents.charge.schema.credential.payload,
         },
       },
     })
@@ -87,7 +77,7 @@ describe('createCredential', () => {
       methods: [tempo({ account: accounts[1], getClient: () => client })],
     })
 
-    const challenge = Challenge.fromIntent(Intents.charge, {
+    const challenge = Challenge.fromIntent(MethodIntents.charge, {
       realm,
       secretKey,
       request: {
@@ -146,7 +136,7 @@ describe('createCredential', () => {
       method: 'stripe',
       schema: {
         credential: {
-          payload: Intents.charge.schema.credential.payload,
+          payload: MethodIntents.charge.schema.credential.payload,
         },
       },
     })
@@ -198,7 +188,7 @@ describe('createCredential', () => {
       methods: [tempo({ getClient: () => client })],
     })
 
-    const challenge = Challenge.fromIntent(Intents.charge, {
+    const challenge = Challenge.fromIntent(MethodIntents.charge, {
       realm,
       secretKey,
       request: {
@@ -230,7 +220,7 @@ describe('createCredential', () => {
       methods: [tempo({ account: accounts[1], getClient: () => client })],
     })
 
-    const challenge = Challenge.fromIntent(Intents.charge, {
+    const challenge = Challenge.fromIntent(MethodIntents.charge, {
       realm,
       secretKey,
       request: {
@@ -261,7 +251,7 @@ describe('createCredential', () => {
       transport: Transport.mcp(),
     })
 
-    const challenge = Challenge.fromIntent(Intents.charge, {
+    const challenge = Challenge.fromIntent(MethodIntents.charge, {
       realm,
       secretKey,
       request: {
@@ -295,7 +285,7 @@ describe('createCredential', () => {
 
 const server = Mpay_server.create({
   methods: [
-    charge_server({
+    tempo_server.charge({
       currency: asset,
       getClient: () => client,
       recipient: accounts[0].address,
@@ -308,7 +298,7 @@ describe('fetch', () => {
     const mpay = Mpay.create({
       polyfill: false,
       methods: [
-        charge_client({
+        tempo.charge({
           account: accounts[1],
           getClient: () => client,
         }),
@@ -316,7 +306,7 @@ describe('fetch', () => {
     })
 
     const httpServer = await Http.createServer(async (req, res) => {
-      const result = await toNodeListener(
+      const result = await Mpay_server.toNodeListener(
         server.charge({
           amount: '1',
         }),
@@ -339,7 +329,7 @@ describe('fetch', () => {
     const mpay = Mpay.create({
       polyfill: false,
       methods: [
-        charge_client({
+        tempo.charge({
           account: accounts[1],
           getClient: () => client,
         }),
@@ -362,14 +352,14 @@ describe('fetch', () => {
     const mpay = Mpay.create({
       polyfill: false,
       methods: [
-        charge_client({
+        tempo.charge({
           getClient: () => client,
         }),
       ],
     })
 
     const httpServer = await Http.createServer(async (req, res) => {
-      const result = await toNodeListener(
+      const result = await Mpay_server.toNodeListener(
         server.charge({
           amount: '1',
         }),
@@ -393,7 +383,7 @@ describe('polyfill', () => {
 
     Mpay.create({
       methods: [
-        charge_client({
+        tempo.charge({
           account: accounts[1],
           getClient: () => client,
         }),
@@ -403,7 +393,7 @@ describe('polyfill', () => {
     expect(globalThis.fetch).not.toBe(originalFetch)
 
     const httpServer = await Http.createServer(async (req, res) => {
-      const result = await toNodeListener(
+      const result = await Mpay_server.toNodeListener(
         server.charge({
           amount: '1',
         }),
@@ -427,7 +417,7 @@ describe('polyfill', () => {
     Mpay.create({
       polyfill: false,
       methods: [
-        charge_client({
+        tempo.charge({
           account: accounts[1],
           getClient: () => client,
         }),
@@ -444,7 +434,7 @@ describe('restore', () => {
 
     Mpay.create({
       methods: [
-        charge_client({
+        tempo.charge({
           account: accounts[1],
           getClient: () => client,
         }),
@@ -464,7 +454,7 @@ describe('restore', () => {
     Mpay.create({
       polyfill: false,
       methods: [
-        charge_client({
+        tempo.charge({
           account: accounts[1],
           getClient: () => client,
         }),

@@ -1,7 +1,5 @@
 import { Mpay, tempo } from 'mpay/server'
-import { createClient, http } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
-import { tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
 
 const account = privateKeyToAccount(generatePrivateKey())
@@ -13,6 +11,7 @@ const mpay = Mpay.create({
       currency,
       feePayer: true,
       recipient: account,
+      testnet: true,
     }),
   ],
 })

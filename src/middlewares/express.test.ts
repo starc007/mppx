@@ -1,17 +1,15 @@
 import express from 'express'
+import { Receipt } from 'mpay'
+import { tempo as tempo_client } from 'mpay/client'
+import { Mpay } from 'mpay/express'
+import { tempo as tempo_server } from 'mpay/server'
 import type { Address } from 'viem'
 import { Addresses } from 'viem/tempo'
 import { beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import { deployEscrow } from '~test/tempo/stream.js'
 import { accounts, asset, client, fundAccount } from '~test/tempo/viem.js'
 import * as Fetch from '../client/Fetch.js'
-import * as Receipt from '../Receipt.js'
-import { charge as charge_client } from '../tempo/client/Charge.js'
-import { stream as stream_client } from '../tempo/client/Stream.js'
-import { charge as charge_server } from '../tempo/server/Charge.js'
-import { stream as stream_server } from '../tempo/server/Stream.js'
 import type { ChannelState, ChannelStorage, SessionState } from '../tempo/stream/Storage.js'
-import { Mpay } from './express.js'
 
 function createServer(app: express.Express) {
   return new Promise<{ url: string; close: () => void }>((resolve) => {
@@ -28,7 +26,7 @@ function createServer(app: express.Express) {
 describe('charge', () => {
   const mpay = Mpay.create({
     methods: [
-      charge_server({
+      tempo_server.charge({
         getClient: () => client,
         currency: asset,
         recipient: accounts[0].address,
@@ -38,7 +36,7 @@ describe('charge', () => {
 
   const fetch = Fetch.from({
     methods: [
-      charge_client({
+      tempo_client.charge({
         account: accounts[1],
         getClient: () => client,
       }),
@@ -100,7 +98,7 @@ describe('stream', () => {
   test('returns 402 when no credential', async () => {
     const mpay = Mpay.create({
       methods: [
-        stream_server({
+        tempo_server.stream({
           storage,
           getClient: () => client,
           recipient: accounts[0].address,
@@ -126,7 +124,7 @@ describe('stream', () => {
   test('returns 200 with receipt on valid payment', async () => {
     const mpay = Mpay.create({
       methods: [
-        stream_server({
+        tempo_server.stream({
           storage,
           getClient: () => client,
           recipient: accounts[0].address,
@@ -139,7 +137,7 @@ describe('stream', () => {
 
     const fetch = Fetch.from({
       methods: [
-        stream_client({
+        tempo_client.stream({
           account: accounts[2],
           deposit: '10',
           getClient: () => client,
