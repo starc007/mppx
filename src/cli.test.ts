@@ -13,7 +13,7 @@ import { stream as stream_server } from './tempo/server/Stream.js'
 
 const cliPath = path.resolve(import.meta.dirname, 'cli.ts')
 const cwd = path.resolve(import.meta.dirname, '..')
-const testAccountName = `cli-test-${Date.now()}`
+const testAccountName = `cli-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 const env = { ...process.env, NODE_NO_WARNINGS: '1' }
 
 function run(args: string[], options?: { input?: string }): string {
