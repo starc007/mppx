@@ -13,17 +13,12 @@ import { stream as stream_ } from './Stream.js'
  * })
  * ```
  */
-export function tempo<const defaults extends tempo.Defaults>(
-  parameters?: tempo.Parameters<defaults>,
-) {
+export function tempo<const parameters extends tempo.Parameters>(parameters?: parameters) {
   return [tempo.charge(parameters), tempo.stream(parameters)] as const
 }
 
 export namespace tempo {
-  export type Defaults = charge_.Defaults & stream_.Defaults
-
-  export type Parameters<defaults extends Defaults = {}> = charge_.Parameters<defaults> &
-    stream_.Parameters<defaults>
+  export type Parameters = charge_.Parameters & stream_.Parameters
 
   /** Creates a Tempo `charge` method intent for one-time TIP-20 token transfers. */
   export const charge = charge_

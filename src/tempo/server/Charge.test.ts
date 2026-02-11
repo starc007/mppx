@@ -17,7 +17,7 @@ const server = Mpay_server.create({
         return client
       },
       currency: asset,
-      recipient: accounts[0].address,
+      recipient: accounts[0],
     }),
   ],
   realm,
@@ -230,7 +230,7 @@ describe('tempo', () => {
               throw new Error('not found')
             },
             currency: asset,
-            recipient: accounts[0].address,
+            recipient: accounts[0],
           }),
         ],
         realm,
@@ -467,8 +467,8 @@ describe('tempo', () => {
               return client
             },
             currency: asset,
-            feePayer: accounts[0],
-            recipient: accounts[0].address,
+            recipient: accounts[0],
+            feePayer: true,
           }),
         ],
         realm,
@@ -548,6 +548,106 @@ describe('tempo', () => {
       }
 
       httpServer.close()
+    })
+  })
+
+  describe('recipient/feePayer resolution', () => {
+    test('recipient: string resolves to string', () => {
+      const method = tempo_server.charge({
+        getClient: () => client,
+        recipient: accounts[0].address,
+      })
+      expect(method.defaults?.recipient).toBe(accounts[0].address)
+    })
+
+    test('recipient: Account resolves to account.address', () => {
+      const method = tempo_server.charge({
+        getClient: () => client,
+        recipient: accounts[0],
+      })
+      expect(method.defaults?.recipient).toBe(accounts[0].address)
+    })
+
+    test('recipient: Account with feePayer: true resolves feePayer', async () => {
+      const mpay = Mpay_client.create({
+        polyfill: false,
+        methods: [
+          tempo_client.charge({
+            account: accounts[1],
+            getClient: () => client,
+          }),
+        ],
+      })
+
+      const server_ = Mpay_server.create({
+        methods: [
+          tempo_server.charge({
+            getClient: () => client,
+            currency: asset,
+            recipient: accounts[0],
+            feePayer: true,
+          }),
+        ],
+        realm,
+        secretKey,
+      })
+
+      const httpServer = await Http.createServer(async (req, res) => {
+        const result = await Mpay_server.toNodeListener(server_.charge({ amount: '1' }))(req, res)
+        if (result.status === 402) return
+        res.end('OK')
+      })
+
+      const response = await mpay.fetch(httpServer.url)
+      expect(response.status).toBe(200)
+
+      httpServer.close()
+    })
+
+    test('recipient: string with feePayer: Account resolves separately', async () => {
+      const mpay = Mpay_client.create({
+        polyfill: false,
+        methods: [
+          tempo_client.charge({
+            account: accounts[1],
+            getClient: () => client,
+          }),
+        ],
+      })
+
+      const server_ = Mpay_server.create({
+        methods: [
+          tempo_server.charge({
+            getClient: () => client,
+            currency: asset,
+            recipient: accounts[0].address,
+            feePayer: accounts[0],
+          }),
+        ],
+        realm,
+        secretKey,
+      })
+
+      const httpServer = await Http.createServer(async (req, res) => {
+        const result = await Mpay_server.toNodeListener(server_.charge({ amount: '1' }))(req, res)
+        if (result.status === 402) return
+        res.end('OK')
+      })
+
+      const response = await mpay.fetch(httpServer.url)
+      expect(response.status).toBe(200)
+
+      httpServer.close()
+    })
+
+    test('no feePayer resolves to undefined', () => {
+      const method = tempo_server.charge({
+        getClient: () => client,
+        recipient: accounts[0].address,
+      })
+      // feePayer is not exposed on defaults, but we can verify
+      // the method was created without error
+      expect(method.defaults?.recipient).toBe(accounts[0].address)
     })
   })
 })

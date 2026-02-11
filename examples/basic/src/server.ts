@@ -17,9 +17,8 @@ const mpay = Mpay.create({
   methods: [
     tempo({
       currency,
-      feePayer: account,
-      getClient: () => client,
-      recipient: account.address,
+      feePayer: true,
+      recipient: account,
       testnet: true,
     }),
   ],
