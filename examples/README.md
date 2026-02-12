@@ -6,11 +6,9 @@ Standalone, runnable examples demonstrating the mpay HTTP 402 payment flow.
 
 | Example | Description |
 |---------|-------------|
-| [basic](./basic/) | Bun server with pay-per-request fortune API |
-| [stream](./stream/) | Streaming payment channels with per-token LLM metering |
-| [streaming/single-fetch](./streaming/single-fetch/) | Single paid request over a payment channel |
-| [streaming/multi-fetch](./streaming/multi-fetch/) | Multiple paid requests on a single channel |
-| [streaming/sse](./streaming/sse/) | Pay-per-token SSE streaming with `Sse.from()` |
+| [basic](./basic/) | Payment-gated Fortune Teller API |
+| [session/multi-fetch](./session/multi-fetch/) | Multiple paid requests over a single payment channel |
+| [session/sse](./session/sse/) | Pay-per-token LLM streaming with SSE |
 
 ## Running Examples
 

@@ -142,7 +142,7 @@ describe('basic charge (examples/basic)', () => {
   })
 })
 
-describe('streaming multi-fetch (examples/streaming/multi-fetch)', () => {
+describe('session multi-fetch (examples/session/multi-fetch)', () => {
   test('happy path: stream payment and receives response', { timeout: 120_000 }, async () => {
     await fundAccount({ address: testAccount.address, token: Addresses.pathUsd })
     await fundAccount({ address: testAccount.address, token: asset })
@@ -204,7 +204,7 @@ describe('streaming multi-fetch (examples/streaming/multi-fetch)', () => {
   })
 })
 
-describe('streaming sse (examples/streaming/sse)', () => {
+describe('session sse (examples/session/sse)', () => {
   test('streams SSE tokens to stdout', { timeout: 120_000 }, async () => {
     await fundAccount({ address: testAccount.address, token: Addresses.pathUsd })
     await fundAccount({ address: testAccount.address, token: asset })

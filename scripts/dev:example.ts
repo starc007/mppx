@@ -43,7 +43,7 @@ if (arg) {
 } else if (examples.length === 1) {
   runExample(examples[0]!)
 } else {
-  console.log('\nAvailable examples:\n')
+  console.log('Available examples:\n')
   for (const [i, example] of examples.entries()) console.log(`  ${i + 1}. ${example.name}`)
   console.log()
 
@@ -61,7 +61,7 @@ if (arg) {
 }
 
 function runExample(example: { name: string; path: string }) {
-  console.log(`\nStarting ${example.name}...\n`)
+  console.log(`Starting ${example.name}...\n`)
   const child = child_process.spawn('pnpm', ['dev'], {
     cwd: example.path,
     stdio: 'inherit',

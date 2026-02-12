@@ -1,5 +1,5 @@
 {
-  "name": "streaming-sse",
+  "name": "session-sse",
   "type": "module",
   "private": true,
   "scripts": {

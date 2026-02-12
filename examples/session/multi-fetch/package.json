@@ -1,5 +1,5 @@
 {
-  "name": "streaming-multi-fetch",
+  "name": "session-multi-fetch",
   "type": "module",
   "private": true,
   "scripts": {
