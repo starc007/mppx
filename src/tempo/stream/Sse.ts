@@ -238,19 +238,25 @@ async function chargeOrWait(options: {
 
   let result = await deductFromChannel(storage, channelId, amount)
 
-  while (!result.ok) {
-    const requiredCumulative = (result.channel.spent + amount).toString()
+  if (!result.ok) {
+    // Emit a single need-voucher event, then poll/wait until the client
+    // sends an updated voucher. The requiredCumulative is constant here:
+    // `spent` only changes on successful deduction (which exits the loop),
+    // so re-emitting on every poll cycle would just cause redundant
+    // voucher POSTs from the client.
     emit(
       formatNeedVoucherEvent({
         channelId,
-        requiredCumulative,
+        requiredCumulative: (result.channel.spent + amount).toString(),
         acceptedCumulative: result.channel.highestVoucherAmount.toString(),
         deposit: result.channel.deposit.toString(),
       }),
     )
 
-    await waitForUpdate(storage, channelId, pollIntervalMs, signal)
-    result = await deductFromChannel(storage, channelId, amount)
+    while (!result.ok) {
+      await waitForUpdate(storage, channelId, pollIntervalMs, signal)
+      result = await deductFromChannel(storage, channelId, amount)
+    }
   }
 }
 
@@ -281,4 +287,93 @@ function abortPromise(signal: AbortSignal): Promise<void> {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Check whether a `Response` carries an SSE event stream.
+ *
+ * Returns `true` when the `Content-Type` header starts with
+ * `text/event-stream` (case-insensitive, ignoring charset params).
+ */
+export function isEventStream(response: Response): boolean {
+  const ct = response.headers.get('content-type')
+  return ct !== null && ct.toLowerCase().startsWith('text/event-stream')
+}
+
+/**
+ * Parse an SSE `Response` body into an async iterable of `data:` payloads.
+ *
+ * Yields the raw `data:` field content for each SSE event in the stream.
+ * Events whose data matches the `skip` predicate are silently dropped
+ * (e.g. `[DONE]` sentinels used by OpenAI-compatible APIs).
+ *
+ * Each yielded value typically becomes one charge tick when fed to
+ * {@link serve} via the SSE transport's auto-charge mode.
+ *
+ * @example
+ * ```ts
+ * const upstream = await fetch('https://api.example.com/stream')
+ * for await (const data of Sse.iterateData(upstream)) {
+ *   console.log(data)
+ * }
+ * ```
+ */
+export async function* iterateData(
+  response: Response,
+  options?: iterateData.Options,
+): AsyncGenerator<string> {
+  const skip = options?.skip
+  const body = response.body
+  if (!body) return
+
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+
+      // Split on double-newline SSE event boundaries.
+      const events = buffer.split('\n\n')
+      // Last element may be incomplete — keep in buffer.
+      buffer = events.pop() ?? ''
+
+      for (const event of events) {
+        if (!event.trim()) continue
+        const data = extractData(event)
+        if (data === null) continue
+        if (skip?.(data)) continue
+        yield data
+      }
+    }
+
+    // Flush remaining buffer.
+    if (buffer.trim()) {
+      const data = extractData(buffer)
+      if (data !== null && !skip?.(data)) yield data
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+export declare namespace iterateData {
+  type Options = {
+    /** Predicate to skip specific data payloads (e.g. `d => d === '[DONE]'`). */
+    skip?: ((data: string) => boolean) | undefined
+  }
+}
+
+/** Extract the `data:` field value from a single SSE event block. */
+function extractData(event: string): string | null {
+  const dataLines: string[] = []
+  for (const line of event.split('\n')) {
+    if (line.startsWith('data: ')) dataLines.push(line.slice(6))
+    else if (line === 'data:') dataLines.push('')
+  }
+  return dataLines.length > 0 ? dataLines.join('\n') : null
 }

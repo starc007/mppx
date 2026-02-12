@@ -1055,7 +1055,7 @@ describe('session', () => {
       expect((result as Response).status).toBe(204)
     })
 
-    test('returns undefined for GET with open action (auto-mode)', () => {
+    test('returns 204 for GET with open action (management actions always gated)', () => {
       const server = createServer()
       const result = server.respond!({
         credential: {
@@ -1066,7 +1066,8 @@ describe('session', () => {
         },
         input: new Request('http://localhost', { method: 'GET' }),
       } as any)
-      expect(result).toBeUndefined()
+      expect(result).toBeInstanceOf(Response)
+      expect((result as Response).status).toBe(204)
     })
 
     test('returns undefined for GET with voucher action (auto-mode)', () => {

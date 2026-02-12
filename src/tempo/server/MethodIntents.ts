@@ -1,6 +1,6 @@
 import { memoryStorage as memoryStorage_ } from '../stream/Storage.js'
 import { charge as charge_ } from './Charge.js'
-import { session as session_ } from './Session.js'
+import { session as session_, settle as settle_ } from './Session.js'
 
 /**
  * Creates both Tempo `charge` and `session` method intents from shared parameters.
@@ -26,4 +26,6 @@ export namespace tempo {
   export const memoryStorage = memoryStorage_
   /** Creates a Tempo `session` method intent for session-based TIP-20 token payments. */
   export const session = session_
+  /** One-shot settle: reads highest voucher from storage and submits on-chain. */
+  export const settle = settle_
 }

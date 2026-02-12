@@ -101,8 +101,13 @@ export function session<const parameters extends session.Parameters>(p?: paramet
   })
   const { recipient, feePayer } = Account.resolve(parameters)
 
-  type Transport = parameters['stream'] extends true ? Transport.Sse : undefined
-  const transport = parameters.stream ? Transport.sse(storage) : undefined
+  type Transport = parameters['stream'] extends false | undefined ? undefined : Transport.Sse
+  const transport = parameters.stream
+    ? Transport.sse({
+        storage,
+        ...(typeof parameters.stream === 'object' ? parameters.stream : undefined),
+      })
+    : undefined
 
   type Defaults = session.DeriveDefaults<parameters>
   return MethodIntent.toServer<typeof Intents.session, Defaults, Transport>(Intents.session, {
@@ -220,18 +225,32 @@ export function session<const parameters extends session.Parameters>(p?: paramet
     // invoking the user's route handler. When it returns undefined, the
     // user's handler runs normally and serves content.
     //
-    // We only gate on POST because POST signals an explicit management
-    // request (SSE/manual mode) — e.g. a mid-stream voucher POST to
-    // /api/chat should NOT start a new SSE stream. GET requests always
-    // fall through so auto-mode clients (whose fetch wrapper bundles
-    // open+voucher into a single GET retry) receive content as expected.
+    // Management actions (open, topUp, close) are always gated — they
+    // return 204 regardless of request method.
+    //
+    // Voucher POSTs are gated only when they have no request body, which
+    // signals a mid-stream voucher update (the client is just topping up
+    // the channel balance). Voucher POSTs WITH a body are content requests
+    // (e.g., an API call to a POST endpoint) and fall through to the
+    // user's handler. GET requests with vouchers always fall through so
+    // auto-mode clients (whose fetch wrapper bundles open+voucher into a
+    // single GET retry) receive content as expected.
     respond({ credential, input }) {
-      if (input.method !== 'POST') return undefined
       const { payload } = credential as Credential.Credential<StreamCredentialPayload>
+
       const isManagement =
         payload.action === 'open' || payload.action === 'topUp' || payload.action === 'close'
+      if (isManagement && input.method === 'POST') return new Response(null, { status: 204 })
+
       const isVoucher = payload.action === 'voucher'
-      if (!isManagement && !isVoucher) return undefined
+      if (!isVoucher) return undefined
+
+      // Only gate voucher POSTs with no body (mid-stream balance updates).
+      // POSTs with a body are content requests that should reach the handler.
+      if (input.method !== 'POST') return undefined
+      const contentLength = input.headers.get('content-length')
+      if (contentLength !== null && contentLength !== '0') return undefined
+      if (input.body !== null) return undefined
       return new Response(null, { status: 204 })
     },
   })
@@ -248,8 +267,14 @@ export declare namespace session {
     minVoucherDelta?: string | undefined
     /** Storage backend for channel state. */
     storage?: Storage | undefined
-    /** Enable SSE streaming. */
-    stream?: boolean | undefined
+    /**
+     * Enable SSE streaming.
+     *
+     * Pass `true` to enable with defaults, or an options object
+     * to configure the stream (e.g. `{ pollingOnly: true }` for
+     * Cloudflare Workers compatibility).
+     */
+    stream?: boolean | Transport.sse.Options | undefined
     /** Testnet mode. */
     testnet?: boolean | undefined
   } & Account.resolve.Parameters &
@@ -608,7 +633,7 @@ async function handleTopUp(
  */
 async function handleVoucher(
   storage: ChannelStorage,
-  client: viem_Client,
+  _client: viem_Client,
   minVoucherDelta: bigint,
   challenge: Challenge.Challenge,
   payload: StreamCredentialPayload & { action: 'voucher' },
@@ -628,7 +653,22 @@ async function handleVoucher(
     payload.signature,
   )
 
-  const onChain = await getOnChainChannel(client, methodDetails.escrowContract, payload.channelId)
+  // Use locally-stored channel state as a trusted cache instead of
+  // reading on-chain for every voucher. The on-chain state is verified
+  // during `open` and `topUp` actions — subsequent vouchers within the
+  // same session can safely use the cached deposit/signer values.
+  // This avoids an RPC round-trip per voucher, which is critical for
+  // high-frequency SSE streaming where vouchers arrive per-token.
+  const cachedOnChain: OnChainChannel = {
+    payer: channel.payer,
+    payee: channel.payee,
+    token: channel.token,
+    deposit: channel.deposit,
+    settled: channel.settledOnChain,
+    finalized: channel.finalized,
+    authorizedSigner: channel.authorizedSigner,
+    closeRequestedAt: 0n,
+  }
 
   return verifyAndAcceptVoucher({
     storage,
@@ -637,7 +677,7 @@ async function handleVoucher(
     channel,
     channelId: payload.channelId,
     voucher,
-    onChain,
+    onChain: cachedOnChain,
     methodDetails,
   })
 }
