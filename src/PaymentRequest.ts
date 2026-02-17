@@ -75,7 +75,7 @@ export function from<const request extends Request>(request: request): request {
  * import { Request } from 'mppx'
  * import { Methods } from 'mppx/tempo'
  *
- * const request = Request.fromIntent(Methods.charge, {
+ * const request = Request.fromMethod(Methods.charge, {
  *   amount: '1000000',
  *   currency: '0x20c0000000000000000000000000000000000001',
  *   recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',
@@ -84,7 +84,7 @@ export function from<const request extends Request>(request: request): request {
  * })
  * ```
  */
-export function fromIntent<const method extends Method.Method>(
+export function fromMethod<const method extends Method.Method>(
   method: method,
   request: z.input<method['schema']['request']>,
 ): Request<z.output<method['schema']['request']>> {

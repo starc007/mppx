@@ -6,7 +6,7 @@ import { describe, expect, test } from 'vitest'
 const realm = 'api.example.com'
 const secretKey = 'test-secret-key'
 
-const challenge = Challenge.fromIntent(Methods.charge, {
+const challenge = Challenge.fromMethod(Methods.charge, {
   realm,
   secretKey,
   request: {

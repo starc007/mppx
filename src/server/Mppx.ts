@@ -160,7 +160,7 @@ function createMethodFn(parameters: createMethodFn.Parameters): createMethodFn.R
         // Recompute challenge from options. The HMAC-bound ID means we don't need to
         // store challenges server-side—if the client echoes back a credential with
         // a matching ID, we know it was issued by us with these exact parameters.
-        const challenge = Challenge.fromIntent(method, {
+        const challenge = Challenge.fromMethod(method, {
           description,
           expires,
           realm,

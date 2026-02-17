@@ -106,9 +106,9 @@ describe('from', () => {
   })
 })
 
-describe('fromIntent', () => {
+describe('fromMethod', () => {
   test('behavior: creates validated challenge from intent', () => {
-    const challenge = Challenge.fromIntent(Methods.charge, {
+    const challenge = Challenge.fromMethod(Methods.charge, {
       id: 'abc123',
       realm: 'api.example.com',
       request: {
@@ -138,7 +138,7 @@ describe('fromIntent', () => {
   })
 
   test('behavior: includes methodDetails in request', () => {
-    const challenge = Challenge.fromIntent(Methods.charge, {
+    const challenge = Challenge.fromMethod(Methods.charge, {
       id: 'abc123',
       realm: 'api.example.com',
       request: {
@@ -174,7 +174,7 @@ describe('fromIntent', () => {
   })
 
   test('behavior: includes optional digest and expires', () => {
-    const challenge = Challenge.fromIntent(Methods.charge, {
+    const challenge = Challenge.fromMethod(Methods.charge, {
       id: 'abc123',
       realm: 'api.example.com',
       request: {
@@ -193,7 +193,7 @@ describe('fromIntent', () => {
   })
 
   test('behavior: creates challenge with HMAC-bound id via secretKey', () => {
-    const challenge = Challenge.fromIntent(Methods.charge, {
+    const challenge = Challenge.fromMethod(Methods.charge, {
       realm: 'api.example.com',
       request: {
         amount: '1',
@@ -212,7 +212,7 @@ describe('fromIntent', () => {
 
   test('error: invalid request', () => {
     expect(() =>
-      Challenge.fromIntent(Methods.charge, {
+      Challenge.fromMethod(Methods.charge, {
         id: 'abc123',
         realm: 'api.example.com',
         request: {

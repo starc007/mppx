@@ -19,9 +19,9 @@ describe('from', () => {
   })
 })
 
-describe('fromIntent', () => {
+describe('fromMethod', () => {
   test('creates a validated request from intent', () => {
-    const request = PaymentRequest.fromIntent(Methods.charge, {
+    const request = PaymentRequest.fromMethod(Methods.charge, {
       amount: '1',
       currency: '0x20c0000000000000000000000000000000000001',
       decimals: 6,
@@ -39,7 +39,7 @@ describe('fromIntent', () => {
   })
 
   test('includes methodDetails fields', () => {
-    const request = PaymentRequest.fromIntent(Methods.charge, {
+    const request = PaymentRequest.fromMethod(Methods.charge, {
       amount: '1',
       currency: '0x20c0000000000000000000000000000000000001',
       decimals: 6,
@@ -62,7 +62,7 @@ describe('fromIntent', () => {
 
   test('throws on invalid request', () => {
     expect(() =>
-      PaymentRequest.fromIntent(Methods.charge, {
+      PaymentRequest.fromMethod(Methods.charge, {
         amount: 123,
         currency: '0x20c0000000000000000000000000000000000001',
         recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fE00',

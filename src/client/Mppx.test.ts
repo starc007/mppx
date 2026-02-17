@@ -79,7 +79,7 @@ describe('createCredential', () => {
       methods: [tempo({ account: accounts[1], getClient: () => client })],
     })
 
-    const challenge = Challenge.fromIntent(Methods.charge, {
+    const challenge = Challenge.fromMethod(Methods.charge, {
       realm,
       secretKey,
       request: {
@@ -192,7 +192,7 @@ describe('createCredential', () => {
       methods: [tempo({ getClient: () => client })],
     })
 
-    const challenge = Challenge.fromIntent(Methods.charge, {
+    const challenge = Challenge.fromMethod(Methods.charge, {
       realm,
       secretKey,
       request: {
@@ -224,7 +224,7 @@ describe('createCredential', () => {
       methods: [tempo({ account: accounts[1], getClient: () => client })],
     })
 
-    const challenge = Challenge.fromIntent(Methods.charge, {
+    const challenge = Challenge.fromMethod(Methods.charge, {
       realm,
       secretKey,
       request: {
@@ -255,7 +255,7 @@ describe('createCredential', () => {
       transport: Transport.mcp(),
     })
 
-    const challenge = Challenge.fromIntent(Methods.charge, {
+    const challenge = Challenge.fromMethod(Methods.charge, {
       realm,
       secretKey,
       request: {

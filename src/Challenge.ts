@@ -186,7 +186,7 @@ export declare namespace from {
  * import { Methods } from 'mppx/tempo'
  *
  * // With HMAC-bound ID (recommended for servers)
- * const challenge = Challenge.fromIntent(
+ * const challenge = Challenge.fromMethod(
  *   Methods.charge,
  *   {
  *     realm: 'api.example.com',
@@ -201,14 +201,14 @@ export declare namespace from {
  * )
  * ```
  */
-export function fromIntent<const method extends Method.Method>(
+export function fromMethod<const method extends Method.Method>(
   method: method,
-  parameters: fromIntent.Parameters<method>,
-): fromIntent.ReturnType<method> {
+  parameters: fromMethod.Parameters<method>,
+): fromMethod.ReturnType<method> {
   const { name: methodName, intent } = method
   const { description, digest, expires, id, realm, secretKey } = parameters
 
-  const request = PaymentRequest.fromIntent(method, parameters.request)
+  const request = PaymentRequest.fromMethod(method, parameters.request)
 
   return from({
     ...(id ? { id } : { secretKey }),
@@ -219,10 +219,10 @@ export function fromIntent<const method extends Method.Method>(
     description,
     digest,
     expires,
-  } as from.Parameters) as fromIntent.ReturnType<method>
+  } as from.Parameters) as fromMethod.ReturnType<method>
 }
 
-export declare namespace fromIntent {
+export declare namespace fromMethod {
   type Parameters<method extends Method.Method> = OneOf<
     | {
         /** Explicit challenge ID. */
