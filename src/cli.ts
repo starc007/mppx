@@ -158,7 +158,7 @@ cli
       }
 
       const account = privateKeyToAccount(privateKey as `0x${string}`)
-      const rpcUrl = options.rpcUrl ?? process.env.RPC_URL
+      const rpcUrl = options.rpcUrl ?? process.env.MPPX_RPC_URL
       const client = createClient({
         chain: await resolveChain({ ...options, rpcUrl }),
         transport: http(rpcUrl),
@@ -920,7 +920,7 @@ cli
         const account = privateKeyToAccount(key as `0x${string}`)
         console.log(`${pc.dim('Address')}  ${account.address}`)
 
-        const rpcUrl = options.rpcUrl ?? process.env.RPC_URL
+        const rpcUrl = options.rpcUrl ?? process.env.MPPX_RPC_URL
         const chain = rpcUrl ? await resolveChain({ rpcUrl }) : undefined
         const balanceLines = await fetchBalanceLines(
           account.address,

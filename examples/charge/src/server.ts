@@ -45,7 +45,7 @@ export async function handler(request: Request): Promise<Response | null> {
 const client = createClient({
   chain: tempoModerato,
   pollingInterval: 1_000,
-  transport: http(process.env.RPC_URL),
+  transport: http(process.env.MPPX_RPC_URL),
 })
 
 // Fund recipient account on startup
