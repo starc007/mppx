@@ -21,9 +21,9 @@ export function openai(config: openai.Config) {
   return Service.from<openai.Config>('openai', {
     baseUrl: config.baseUrl ?? 'https://api.openai.com',
     description: 'Chat completions, embeddings, image generation, and audio transcription.',
-    docsLlmsUrl: ({ endpoint }) =>
-      endpoint
-        ? `https://context7.com/websites/platform_openai/llms.txt?topic=${encodeURIComponent(endpoint)}`
+    docsLlmsUrl: ({ route }) =>
+      route
+        ? `https://context7.com/websites/platform_openai/llms.txt?topic=${encodeURIComponent(route)}`
         : undefined,
     rewriteRequest(request, ctx) {
       const apiKey = ctx.apiKey ?? config.apiKey

@@ -9,7 +9,7 @@ export type Service = {
   /** Unique identifier used as the URL prefix (e.g. `'openai'` → `/{id}/...`). */
   id: string
   /** Returns a documentation URL. Called with no argument for the service root, or with a route pattern for per-endpoint docs. */
-  docsLlmsUrl?: ((options: { endpoint?: string | undefined }) => string | undefined) | undefined
+  docsLlmsUrl?: ((options: { route?: string | undefined }) => string | undefined) | undefined
   /** Hook to modify the upstream request before sending (e.g. inject auth headers). */
   rewriteRequest?: ((req: Request, ctx: Context) => Request | Promise<Request>) | undefined
   /** Hook to modify the upstream response before returning to the client. */
@@ -109,7 +109,7 @@ export declare namespace from {
     /** Documentation URL for the service. String for a static base URL, or a function receiving an optional endpoint pattern. */
     docsLlmsUrl?:
       | string
-      | ((options: { endpoint?: string | undefined }) => string | undefined)
+      | ((options: { route?: string | undefined }) => string | undefined)
       | undefined
     /** Shorthand: full request mutation function. Takes priority over `bearer`/`headers`. */
     mutate?: ((req: Request) => Request | Promise<Request>) | undefined
@@ -168,7 +168,7 @@ export function serialize(s: Service) {
       const tokens = pattern.trim().split(/\s+/)
       const hasMethod = tokens.length >= 2
       return {
-        docsLlmsUrl: s.docsLlmsUrl?.({ endpoint: pattern }),
+        docsLlmsUrl: s.docsLlmsUrl?.({ route: pattern }),
         method: hasMethod ? tokens[0] : undefined,
         path: hasMethod ? tokens.slice(1).join(' ') : tokens[0],
         pattern,
@@ -259,9 +259,9 @@ function resolvePayment(endpoint: Endpoint): Record<string, unknown> | null {
 }
 
 function resolveLlmsUrl(
-  input: string | ((options: { endpoint?: string | undefined }) => string | undefined) | undefined,
+  input: string | ((options: { route?: string | undefined }) => string | undefined) | undefined,
 ): Service['docsLlmsUrl'] {
   if (!input) return undefined
   if (typeof input === 'function') return input
-  return ({ endpoint }) => (endpoint ? undefined : input)
+  return ({ route }) => (route ? undefined : input)
 }

@@ -21,9 +21,9 @@ export function stripe(config: stripe.Config) {
   return Service.from<stripe.Config>('stripe', {
     baseUrl: config.baseUrl ?? 'https://api.stripe.com',
     description: 'Payment processing, customers, subscriptions, and invoices.',
-    docsLlmsUrl: ({ endpoint }) =>
-      endpoint
-        ? `https://context7.com/websites/stripe/llms.txt?topic=${encodeURIComponent(endpoint)}`
+    docsLlmsUrl: ({ route }) =>
+      route
+        ? `https://context7.com/websites/stripe/llms.txt?topic=${encodeURIComponent(route)}`
         : 'https://docs.stripe.com/llms.txt',
     rewriteRequest(request, ctx) {
       const apiKey = ctx.apiKey ?? config.apiKey
