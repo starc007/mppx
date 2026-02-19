@@ -203,36 +203,7 @@ export function toLlmsTxt(
     const parts = [paid && `${paid} paid`, free && `${free} free`].filter(Boolean).join(', ')
     const label = s.title ?? s.id
     const desc = s.description ? `: ${s.description} (${parts})` : `: ${parts}`
-    lines.push(`- [${label}](${s.baseUrl})${desc}`)
-  }
-
-  for (const s of services) {
-    const serialized = serialize(s)
-    const docsLlmsUrl = s.docsLlmsUrl?.({})
-    lines.push('', `## ${s.title ?? s.id}`, '')
-    if (s.description) lines.push(s.description, '')
-    if (docsLlmsUrl) lines.push(`Documentation: ${docsLlmsUrl}`, '')
-    for (const route of serialized.routes) {
-      const p = route.payment as Record<string, unknown> | null
-      const desc = p?.description ? ` - ${p.description}` : ''
-      lines.push(`- \`${route.pattern}\`${desc}`)
-      if (!p) {
-        lines.push(`  - Type: free`)
-      } else {
-        lines.push(`  - Type: ${p.intent}`)
-        if (p.amount) {
-          const perUnit = p.unitType ? `/${p.unitType}` : ''
-          if (p.decimals !== undefined) {
-            const price = Number(p.amount) / 10 ** Number(p.decimals)
-            lines.push(`  - Price: ${price}${perUnit} (${p.amount} units, ${p.decimals} decimals)`)
-          } else {
-            lines.push(`  - Units: ${p.amount}${perUnit}`)
-          }
-        }
-        if (p.currency) lines.push(`  - Currency: ${p.currency}`)
-      }
-      if (route.docsLlmsUrl) lines.push(`  - Docs: ${route.docsLlmsUrl}`)
-    }
+    lines.push(`- [${label}](/services/${s.id})${desc}`)
   }
 
   return lines.join('\n')

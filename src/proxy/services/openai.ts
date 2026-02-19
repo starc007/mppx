@@ -24,7 +24,7 @@ export function openai(config: openai.Config) {
     docsLlmsUrl: ({ route }) =>
       route
         ? `https://context7.com/websites/platform_openai/llms.txt?topic=${encodeURIComponent(route)}`
-        : undefined,
+        : 'https://context7.com/websites/platform_openai/llms.txt',
     rewriteRequest(request, ctx) {
       const apiKey = ctx.apiKey ?? config.apiKey
       request.headers.set('Authorization', `Bearer ${apiKey}`)

@@ -177,36 +177,8 @@ describe('create', () => {
 
       ## Services
 
-      - [OpenAI](https://api.openai.com): Chat completions, embeddings, image generation, and audio transcription. (2 paid)
-      - [Anthropic](https://api.anthropic.com): Claude language models for messages and completions. (2 paid)
-
-      ## OpenAI
-
-      Chat completions, embeddings, image generation, and audio transcription.
-
-      - \`POST /v1/chat/completions\` - Chat completion
-        - Type: charge
-        - Price: 0.05 (50000 units, 6 decimals)
-        - Currency: 0x20c0000000000000000000000000000000000001
-        - Docs: https://context7.com/websites/platform_openai/llms.txt?topic=POST%20%2Fv1%2Fchat%2Fcompletions
-      - \`POST /v1/embeddings\` - Generate embeddings
-        - Type: charge
-        - Price: 0.01 (10000 units, 6 decimals)
-        - Currency: 0x20c0000000000000000000000000000000000001
-        - Docs: https://context7.com/websites/platform_openai/llms.txt?topic=POST%20%2Fv1%2Fembeddings
-
-      ## Anthropic
-
-      Claude language models for messages and completions.
-
-      - \`POST /v1/messages\` - Send message
-        - Type: charge
-        - Price: 0.03 (30000 units, 6 decimals)
-        - Currency: 0x20c0000000000000000000000000000000000001
-      - \`POST /v1/messages/stream\` - Stream message
-        - Type: session
-        - Price: 0.01/token (10000 units, 6 decimals)
-        - Currency: 0x20c0000000000000000000000000000000000001"
+      - [OpenAI](/services/openai): Chat completions, embeddings, image generation, and audio transcription. (2 paid)
+      - [Anthropic](/services/anthropic): Claude language models for messages and completions. (2 paid)"
     `)
   })
 
