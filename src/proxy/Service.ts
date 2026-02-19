@@ -107,7 +107,10 @@ export declare namespace from {
     /** Shorthand: inject custom headers. */
     headers?: Record<string, string> | undefined
     /** Documentation URL for the service. String for a static base URL, or a function receiving an optional endpoint pattern. */
-    docsLlmsUrl?: string | ((options: { endpoint?: string | undefined }) => string | undefined) | undefined
+    docsLlmsUrl?:
+      | string
+      | ((options: { endpoint?: string | undefined }) => string | undefined)
+      | undefined
     /** Shorthand: full request mutation function. Takes priority over `bearer`/`headers`. */
     mutate?: ((req: Request) => Request | Promise<Request>) | undefined
     /** Hook to modify the upstream request. Receives typed per-endpoint options via `ctx`. */

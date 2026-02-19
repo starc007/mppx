@@ -67,8 +67,9 @@ export function create(config: create.Config): Proxy {
           description: config.description,
         }),
         {
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      })
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        },
+      )
 
     if (request.method === 'GET' && (pathname === '/services' || pathname === '/services/'))
       return Response.json(config.services.map(Service.serialize))
