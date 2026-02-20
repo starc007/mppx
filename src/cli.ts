@@ -1435,8 +1435,8 @@ function chainName(chain: { id: number; name: string }) {
 }
 
 const pathUsd = '0x20c0000000000000000000000000000000000000' as Address
-const usdcE = '0x20C000000000000000000000b9537d11c60E8b50' as Address
-const mainnetTokens = [pathUsd, usdcE] as const
+const usdc = '0x20C000000000000000000000b9537d11c60E8b50' as Address
+const mainnetTokens = [pathUsd, usdc] as const
 const testnetTokens = [
   '0x20c0000000000000000000000000000000000000',
   '0x20c0000000000000000000000000000000000001',
@@ -1476,7 +1476,7 @@ async function fetchTokenInfo(
   ])
   const knownSymbols: Record<string, string> = {
     [pathUsd]: 'PathUSD',
-    [usdcE]: 'USDC.e',
+    [usdc]: 'USDC',
   }
   const symbol = knownSymbols[token] ?? metadata.symbol
   const decimals = 'decimals' in metadata ? metadata.decimals : 6
