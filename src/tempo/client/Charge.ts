@@ -61,6 +61,7 @@ export function charge(parameters: charge.Parameters = {}) {
           }),
         ],
         ...(methodDetails?.feePayer && { feePayer: true }),
+        nonceKey: 'expiring',
       } as never)
       // FIXME: figure out gas estimation issue for fee payer tx
       prepared.gas = prepared.gas! + 5_000n
