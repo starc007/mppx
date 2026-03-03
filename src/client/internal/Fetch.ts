@@ -160,7 +160,13 @@ export function restore(): void {
 /** @internal Normalizes headers to a plain object for spreading. */
 function normalizeHeaders(headers: unknown): Record<string, string> {
   if (!headers) return {}
-  if (headers instanceof Headers) return Object.fromEntries(headers.entries())
+  if (headers instanceof Headers) {
+    const result: Record<string, string> = {}
+    headers.forEach((value, key) => {
+      result[key] = value
+    })
+    return result
+  }
   if (Array.isArray(headers)) return Object.fromEntries(headers)
   return headers as Record<string, string>
 }
