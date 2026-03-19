@@ -1,4 +1,4 @@
-import { decodeFunctionData, isAddressEqual, parseEventLogs, type TransactionReceipt } from 'viem'
+import { decodeFunctionData, parseEventLogs, type TransactionReceipt } from 'viem'
 import {
   getTransactionReceipt,
   sendRawTransaction,
@@ -13,6 +13,7 @@ import type { LooseOmit } from '../../internal/types.js'
 import * as Method from '../../Method.js'
 import * as Client from '../../viem/Client.js'
 import * as Account from '../internal/account.js'
+import * as TempoAddress from '../internal/address.js'
 import * as defaults from '../internal/defaults.js'
 import * as FeePayer from '../internal/fee-payer.js'
 import * as Selectors from '../internal/selectors.js'
@@ -132,8 +133,8 @@ export function charge<const parameters extends charge.Parameters>(
 
             const match = memoLogs.find(
               (log) =>
-                isAddressEqual(log.address, currency) &&
-                isAddressEqual(log.args.to, recipient) &&
+                TempoAddress.isEqual(log.address, currency) &&
+                TempoAddress.isEqual(log.args.to, recipient) &&
                 log.args.amount.toString() === amount &&
                 log.args.memo.toLowerCase() === memo.toLowerCase(),
             )
@@ -163,8 +164,8 @@ export function charge<const parameters extends charge.Parameters>(
 
             const match = [...transferLogs, ...memoLogs].find(
               (log) =>
-                isAddressEqual(log.address, currency) &&
-                isAddressEqual(log.args.to, recipient) &&
+                TempoAddress.isEqual(log.address, currency) &&
+                TempoAddress.isEqual(log.args.to, recipient) &&
                 log.args.amount.toString() === amount,
             )
 
@@ -186,7 +187,7 @@ export function charge<const parameters extends charge.Parameters>(
           const calls = transaction.calls ?? []
 
           const call = calls.find((call) => {
-            if (!call.to || !isAddressEqual(call.to, currency)) return false
+            if (!call.to || !TempoAddress.isEqual(call.to, currency)) return false
             if (!call.data) return false
 
             const selector = call.data.slice(0, 10)
@@ -197,7 +198,7 @@ export function charge<const parameters extends charge.Parameters>(
                 const { args } = decodeFunctionData({ abi: Abis.tip20, data: call.data })
                 const [to, amount_, memo_] = args as [`0x${string}`, bigint, `0x${string}`]
                 return (
-                  isAddressEqual(to, recipient) &&
+                  TempoAddress.isEqual(to, recipient) &&
                   amount_.toString() === amount &&
                   memo_.toLowerCase() === memo.toLowerCase()
                 )
@@ -210,7 +211,7 @@ export function charge<const parameters extends charge.Parameters>(
               try {
                 const { args } = decodeFunctionData({ abi: Abis.tip20, data: call.data })
                 const [to, amount_] = args as [`0x${string}`, bigint]
-                return isAddressEqual(to, recipient) && amount_.toString() === amount
+                return TempoAddress.isEqual(to, recipient) && amount_.toString() === amount
               } catch {
                 return false
               }
@@ -220,7 +221,7 @@ export function charge<const parameters extends charge.Parameters>(
               try {
                 const { args } = decodeFunctionData({ abi: Abis.tip20, data: call.data })
                 const [to, amount_] = args as [`0x${string}`, bigint, `0x${string}`]
-                return isAddressEqual(to, recipient) && amount_.toString() === amount
+                return TempoAddress.isEqual(to, recipient) && amount_.toString() === amount
               } catch {
                 return false
               }

@@ -1,7 +1,7 @@
 import type { Address, Client } from 'viem'
-import { isAddressEqual } from 'viem'
 import { readContract } from 'viem/actions'
 import { Actions, Addresses } from 'viem/tempo'
+import * as TempoAddress from './address.js'
 import * as defaults from './defaults.js'
 
 /** Basis-point denominator (100% = 10 000 bps). */
@@ -26,7 +26,7 @@ export async function findCalls(
 ): Promise<findCalls.ReturnType> {
   const { account, amountOut, tokenOut, tokenIn, slippage } = parameters
 
-  const candidates = tokenIn.filter((t) => !isAddressEqual(t, tokenOut))
+  const candidates = tokenIn.filter((t) => !TempoAddress.isEqual(t, tokenOut))
 
   const balanceResults = await Promise.allSettled([
     readContract(client, Actions.token.getBalance.call({ account, token: tokenOut }) as never),
@@ -108,7 +108,7 @@ export function resolve(
   const tokenIn = value.tokenIn
     ? [
         ...value.tokenIn,
-        ...defaultCurrencies.filter((d) => !value.tokenIn!.some((c) => isAddressEqual(c, d))),
+        ...defaultCurrencies.filter((d) => !value.tokenIn!.some((c) => TempoAddress.isEqual(c, d))),
       ]
     : defaultCurrencies
   return {

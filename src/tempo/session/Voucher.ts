@@ -1,8 +1,9 @@
 import { type Address, Signature } from 'ox'
 import { SignatureEnvelope } from 'ox/tempo'
 import type { Account, Client, Hex } from 'viem'
-import { isAddressEqual, recoverTypedDataAddress } from 'viem'
+import { recoverTypedDataAddress } from 'viem'
 import { signTypedData } from 'viem/actions'
+import * as TempoAddress from '../internal/address.js'
 import type { SignedVoucher, Voucher } from './Types.js'
 
 /** Must match the on-chain TempoStreamChannel DOMAIN_SEPARATOR name. */
@@ -107,7 +108,7 @@ export async function verifyVoucher(
       message,
       signature: voucher.signature,
     })
-    return isAddressEqual(signer, expectedSigner)
+    return TempoAddress.isEqual(signer, expectedSigner)
   } catch {
     return false
   }

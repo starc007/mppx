@@ -1,5 +1,6 @@
-import { decodeFunctionData, isAddressEqual } from 'viem'
-import { Abis, Addresses } from 'viem/tempo'
+import { decodeFunctionData } from 'viem'
+import { Abis, Addresses, type TempoAddress } from 'viem/tempo'
+import * as TempoAddress_internal from './address.js'
 import * as Selectors from './selectors.js'
 
 /**
@@ -15,7 +16,7 @@ export const callScopes = [
 
 /** Validates that a set of transaction calls matches an allowed fee-payer pattern. */
 export function validateCalls(
-  calls: readonly { data?: `0x${string}` | undefined; to?: `0x${string}` | undefined }[],
+  calls: readonly { data?: `0x${string}` | undefined; to?: TempoAddress.Address | undefined }[],
   details: Record<string, string>,
 ) {
   const callSelectors = calls.map((c) => c.data?.slice(0, 10))
@@ -31,11 +32,14 @@ export function validateCalls(
   const approveCall = calls.find((c) => c.data?.slice(0, 10) === Selectors.approve)
   if (approveCall) {
     const { args } = decodeFunctionData({ abi: Abis.tip20, data: approveCall.data! })
-    if (!isAddressEqual((args as [`0x${string}`])[0]!, Addresses.stablecoinDex))
+    if (!TempoAddress_internal.isEqual((args as [`0x${string}`])[0]!, Addresses.stablecoinDex))
       throw new FeePayerValidationError('approve spender is not the DEX', details)
   }
   const buyCall = calls.find((c) => c.data?.slice(0, 10) === Selectors.swapExactAmountOut)
-  if (buyCall && (!buyCall.to || !isAddressEqual(buyCall.to, Addresses.stablecoinDex)))
+  if (
+    buyCall &&
+    (!buyCall.to || !TempoAddress_internal.isEqual(buyCall.to, Addresses.stablecoinDex))
+  )
     throw new FeePayerValidationError('buy target is not the DEX', details)
 }
 

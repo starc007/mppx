@@ -6,7 +6,6 @@ import {
   encodeFunctionData,
   getAbiItem,
   type Hex,
-  isAddressEqual,
   type ReadContractReturnType,
   toFunctionSelector,
 } from 'viem'
@@ -21,6 +20,7 @@ import {
 } from 'viem/actions'
 import { Transaction } from 'viem/tempo'
 import { BadRequestError, ChannelClosedError, VerificationFailedError } from '../../Errors.js'
+import * as TempoAddress from '../internal/address.js'
 import * as defaults from '../internal/defaults.js'
 import { escrowAbi } from './escrow.abi.js'
 import type { SignedVoucher } from './Types.js'
@@ -227,7 +227,7 @@ export async function broadcastOpenTransaction(parameters: {
   const calls = transaction.calls ?? []
 
   const openCall = calls.find((call) => {
-    if (!call.to || !isAddressEqual(call.to, escrowContract)) return false
+    if (!call.to || !TempoAddress.isEqual(call.to, escrowContract)) return false
     if (!call.data) return false
     return call.data.slice(0, 10) === escrowOpenSelector
   })
@@ -246,8 +246,9 @@ export async function broadcastOpenTransaction(parameters: {
       }
       const selector = call.data.slice(0, 10)
       const isEscrowOpen =
-        isAddressEqual(call.to, escrowContract) && selector === escrowOpenSelector
-      const isTokenApprove = isAddressEqual(call.to, currency) && selector === erc20ApproveSelector
+        TempoAddress.isEqual(call.to, escrowContract) && selector === escrowOpenSelector
+      const isTokenApprove =
+        TempoAddress.isEqual(call.to, currency) && selector === erc20ApproveSelector
       if (!isEscrowOpen && !isTokenApprove) {
         throw new BadRequestError({
           reason: 'fee-sponsored open transaction contains an unauthorized call',
@@ -265,12 +266,12 @@ export async function broadcastOpenTransaction(parameters: {
     Address,
   ]
 
-  if (!isAddressEqual(payee, recipient)) {
+  if (!TempoAddress.isEqual(payee, recipient)) {
     throw new VerificationFailedError({
       reason: 'open transaction payee does not match server recipient',
     })
   }
-  if (!isAddressEqual(token, currency)) {
+  if (!TempoAddress.isEqual(token, currency)) {
     throw new VerificationFailedError({
       reason: 'open transaction token does not match server currency',
     })
@@ -370,7 +371,7 @@ export async function broadcastTopUpTransaction(parameters: {
   const calls = transaction.calls ?? []
 
   const topUpCall = calls.find((call) => {
-    if (!call.to || !isAddressEqual(call.to, escrowContract)) return false
+    if (!call.to || !TempoAddress.isEqual(call.to, escrowContract)) return false
     if (!call.data) return false
     return call.data.slice(0, 10) === escrowTopUpSelector
   })
@@ -389,8 +390,9 @@ export async function broadcastTopUpTransaction(parameters: {
       }
       const selector = call.data.slice(0, 10)
       const isEscrowTopUp =
-        isAddressEqual(call.to, escrowContract) && selector === escrowTopUpSelector
-      const isTokenApprove = isAddressEqual(call.to, currency) && selector === erc20ApproveSelector
+        TempoAddress.isEqual(call.to, escrowContract) && selector === escrowTopUpSelector
+      const isTokenApprove =
+        TempoAddress.isEqual(call.to, currency) && selector === erc20ApproveSelector
       if (!isEscrowTopUp && !isTokenApprove) {
         throw new BadRequestError({
           reason: 'fee-sponsored topUp transaction contains an unauthorized call',
