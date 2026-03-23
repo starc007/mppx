@@ -3,6 +3,9 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   ci-gate:
     name: CI Gate
