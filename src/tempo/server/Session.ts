@@ -31,7 +31,7 @@ import {
   VerificationFailedError,
 } from '../../Errors.js'
 import type { Challenge, Credential } from '../../index.js'
-import type { LooseOmit } from '../../internal/types.js'
+import type { LooseOmit, NoExtraKeys } from '../../internal/types.js'
 import * as Method from '../../Method.js'
 import * as Store from '../../Store.js'
 import * as Client from '../../viem/Client.js'
@@ -83,7 +83,9 @@ type SessionMethodDetails = {
  * })
  * ```
  */
-export function session<const parameters extends session.Parameters>(p?: parameters) {
+export function session<const parameters extends session.Parameters>(
+  p?: NoExtraKeys<parameters, session.Parameters>,
+) {
   const parameters = p as parameters
   const {
     amount,
