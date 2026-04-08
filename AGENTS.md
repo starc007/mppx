@@ -142,6 +142,10 @@ id = base64url(HMAC-SHA256(server_secret, input))
 
 **Verification:** Server recomputes HMAC from echoed challenge parameters and compares to `id`. If mismatch, reject credential.
 
+## Versioning
+
+mppx is pre-v1. **Always use `patch` bumps** unless a change is a substantial, unavoidable breaking change to the public API. New features, additive API surface, internal refactors, and bug fixes are all patches. Reserve `minor` for genuinely breaking changes that require consumer migration (e.g., removing/renaming a public export, changing a hook signature incompatibly). Never use `major` until v1.
+
 ## Changesets
 
 **Never manually edit `CHANGELOG.md`.** Use [changesets](https://github.com/changesets/changesets) instead:
