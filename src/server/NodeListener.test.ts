@@ -17,6 +17,11 @@ function createMockRequest(options: {
   IncomingMessage,
   ServerResponse & { body: Buffer[]; headers?: Record<string, string | string[]> },
 ] {
+  type MockResponse = ServerResponse & {
+    body: Buffer[]
+    headers?: Record<string, string | string[]>
+  }
+
   const rawHeaders = options.rawHeaders ?? []
   const headers = Object.fromEntries(
     rawHeaders.reduce<[string, string][]>((acc, value, index, values) => {
@@ -36,6 +41,7 @@ function createMockRequest(options: {
     req,
     body: [] as Buffer[],
     writeHead(
+      this: MockResponse,
       _statusCode: number,
       statusMessageOrHeaders?: string | Record<string, string | string[]>,
       headersMaybe?: Record<string, string | string[]>,
@@ -46,16 +52,16 @@ function createMockRequest(options: {
           : (statusMessageOrHeaders ?? {})
       return this
     },
-    write(chunk: Uint8Array | string) {
+    write(this: MockResponse, chunk: Uint8Array | string) {
       this.body.push(Buffer.from(chunk))
       return true
     },
-    end(chunk?: Uint8Array | string) {
+    end(this: MockResponse, chunk?: Uint8Array | string) {
       if (chunk) this.body.push(Buffer.from(chunk))
       this.emit('finish')
       return this
     },
-  }) as unknown as ServerResponse & { body: Buffer[]; headers?: Record<string, string | string[]> }
+  }) as unknown as MockResponse
 
   return [req, res]
 }
