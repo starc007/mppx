@@ -1,3 +1,6 @@
+import { EventEmitter } from 'node:events'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+
 import { NodeListener, Request } from 'mppx/server'
 import { afterEach, describe, expect, test } from 'vp/test'
 import * as Http from '~test/Http.js'
@@ -5,6 +8,57 @@ import * as Http from '~test/Http.js'
 let server: Awaited<ReturnType<typeof Http.createServer>> | undefined
 
 afterEach(() => server?.close())
+
+function createMockRequest(options: {
+  method?: string
+  url?: string
+  rawHeaders?: string[]
+}): [
+  IncomingMessage,
+  ServerResponse & { body: Buffer[]; headers?: Record<string, string | string[]> },
+] {
+  const rawHeaders = options.rawHeaders ?? []
+  const headers = Object.fromEntries(
+    rawHeaders.reduce<[string, string][]>((acc, value, index, values) => {
+      if (index % 2 === 0 && values[index + 1]) acc.push([value.toLowerCase(), values[index + 1]!])
+      return acc
+    }, []),
+  )
+  const req = Object.assign(new EventEmitter(), {
+    method: options.method ?? 'GET',
+    url: options.url ?? '/',
+    headers,
+    rawHeaders,
+    socket: {},
+  }) as unknown as IncomingMessage
+
+  const res = Object.assign(new EventEmitter(), {
+    req,
+    body: [] as Buffer[],
+    writeHead(
+      _statusCode: number,
+      statusMessageOrHeaders?: string | Record<string, string | string[]>,
+      headersMaybe?: Record<string, string | string[]>,
+    ) {
+      this.headers =
+        typeof statusMessageOrHeaders === 'string'
+          ? (headersMaybe ?? {})
+          : (statusMessageOrHeaders ?? {})
+      return this
+    },
+    write(chunk: Uint8Array | string) {
+      this.body.push(Buffer.from(chunk))
+      return true
+    },
+    end(chunk?: Uint8Array | string) {
+      if (chunk) this.body.push(Buffer.from(chunk))
+      this.emit('finish')
+      return this
+    },
+  }) as unknown as ServerResponse & { body: Buffer[]; headers?: Record<string, string | string[]> }
+
+  return [req, res]
+}
 
 describe('sendResponse', () => {
   test('writes status and headers', async () => {
@@ -184,5 +238,23 @@ describe('toNodeListener', () => {
 
     const response = await fetch(server.url)
     expect(await response.text()).toBe('abc')
+  })
+
+  test('routes malformed host header URL parsing errors through onError', async () => {
+    const [req, res] = createMockRequest({
+      rawHeaders: ['Host', 'a, b'],
+    })
+    const onError = vi.fn((error: unknown) => {
+      return new Response(error instanceof TypeError ? 'bad host' : 'unexpected', {
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' },
+      })
+    })
+    const handler = Request.toNodeListener(async () => new Response('ok'), { onError })
+
+    await expect(Promise.resolve(handler(req, res))).resolves.toBeUndefined()
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError.mock.calls[0]![0]).toBeInstanceOf(TypeError)
+    expect(Buffer.concat(res.body).toString()).toBe('bad host')
   })
 })

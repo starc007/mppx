@@ -32,9 +32,9 @@ export function toNodeListener(
     })
 
   return (async (req: IncomingMessage, res: ServerResponse) => {
-    const request = fromNodeListener(req, res, options)
     let response: Response
     try {
+      const request = fromNodeListener(req, res, options)
       response = await handler(request)
     } catch (error) {
       try {
