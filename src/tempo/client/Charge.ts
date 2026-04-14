@@ -47,7 +47,7 @@ export function charge(parameters: charge.Parameters = {}) {
     context: z.object({
       account: z.optional(z.custom<Account.getResolver.Parameters['account']>()),
       autoSwap: z.optional(z.custom<charge.AutoSwap>()),
-      mode: z.optional(z.enum(['push', 'pull'])),
+      mode: z.optional(z.enum(Methods.chargeModes)),
     }),
 
     async createCredential({ challenge, context }) {
@@ -74,11 +74,7 @@ export function charge(parameters: charge.Parameters = {}) {
         })
       }
 
-      const mode =
-        context?.mode ?? parameters.mode ?? (account.type === 'json-rpc' ? 'push' : 'pull')
-
       const currency = request.currency as Address
-
       if (parameters.expectedRecipients) {
         const allowed = new Set(parameters.expectedRecipients.map((a) => a.toLowerCase()))
         const splits = methodDetails?.splits as readonly { recipient: string }[] | undefined
@@ -89,6 +85,21 @@ export function charge(parameters: charge.Parameters = {}) {
           }
         }
       }
+      const supportedModes = (methodDetails?.supportedModes as
+        | readonly Methods.ChargeMode[]
+        | undefined) ?? ['pull', 'push']
+      const mode = (() => {
+        const explicitMode = context?.mode ?? parameters.mode
+        if (explicitMode) {
+          if (!supportedModes.includes(explicitMode))
+            throw new Error(`Challenge does not support ${explicitMode} mode.`)
+          return explicitMode
+        }
+
+        const preferredMode = account.type === 'json-rpc' ? 'push' : 'pull'
+        if (supportedModes.includes(preferredMode)) return preferredMode
+        return supportedModes[0]!
+      })()
 
       const memo = methodDetails?.memo
         ? (methodDetails.memo as Hex.Hex)
@@ -193,9 +204,12 @@ export declare namespace charge {
      * - `'push'`: Client broadcasts the transaction and sends the tx hash to the server.
      * - `'pull'`: Client signs the transaction and sends the serialized tx to the server for broadcast.
      *
+     * If the server advertises `supportedModes`, this setting must be one of
+     * the supported values for the challenge.
+     *
      * @default `'push'` for JSON-RPC accounts, `'pull'` for local accounts.
      */
-    mode?: 'push' | 'pull' | undefined
+    mode?: Methods.ChargeMode | undefined
   } & Account.getResolver.Parameters &
     Client.getResolver.Parameters
 }

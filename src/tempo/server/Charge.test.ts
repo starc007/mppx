@@ -15,7 +15,7 @@ import { Abis, Account, Actions, Addresses, Secp256k1, Tick, Transaction } from 
 import { beforeAll, describe, expect, test } from 'vp/test'
 import * as Http from '~test/Http.js'
 import { closeChannelOnChain, deployEscrow, openChannel } from '~test/tempo/session.js'
-import { accounts, asset, chain, client, fundAccount } from '~test/tempo/viem.js'
+import { accounts, asset, chain, client, fundAccount, http } from '~test/tempo/viem.js'
 
 import * as Store from '../../Store.js'
 import * as Attribution from '../Attribution.js'
@@ -120,6 +120,166 @@ describe('tempo', () => {
 
       const receipt = Receipt.fromResponse(response)
       expect(receipt.status).toBe('success')
+
+      httpServer.close()
+    })
+
+    test('behavior: client rejects unsupported explicit push mode', async () => {
+      const mppx = Mppx_client.create({
+        polyfill: false,
+        methods: [
+          tempo_client({
+            account: accounts[1],
+            mode: 'push',
+            getClient: () => client,
+          }),
+        ],
+      })
+
+      const httpServer = await Http.createServer(async (req, res) => {
+        const result = await Mppx_server.toNodeListener(
+          server.charge({ amount: '1', decimals: 6, supportedModes: ['pull'] }),
+        )(req, res)
+        if (result.status === 402) return
+        res.end('OK')
+      })
+
+      const response = await fetch(httpServer.url)
+      expect(response.status).toBe(402)
+
+      await expect(mppx.createCredential(response)).rejects.toThrow(
+        'Challenge does not support push mode.',
+      )
+
+      httpServer.close()
+    })
+
+    test('behavior: falls back to pull when push is not advertised', async () => {
+      const jsonRpcClient = createClient({
+        account: accounts[0].address,
+        chain,
+        transport: http(),
+      })
+
+      const mppx = Mppx_client.create({
+        polyfill: false,
+        methods: [
+          tempo_client({
+            getClient: () => jsonRpcClient,
+          }),
+        ],
+      })
+
+      const httpServer = await Http.createServer(async (req, res) => {
+        const result = await Mppx_server.toNodeListener(
+          server.charge({
+            amount: '1',
+            decimals: 6,
+            recipient: accounts[2].address,
+            supportedModes: ['pull'],
+          }),
+        )(req, res)
+        if (result.status === 402) return
+        res.end('OK')
+      })
+
+      const response = await fetch(httpServer.url)
+      expect(response.status).toBe(402)
+
+      const credential = Credential.deserialize<{ type: 'hash' | 'proof' | 'transaction' }>(
+        await mppx.createCredential(response),
+      )
+      expect(credential.payload.type).toBe('transaction')
+
+      const authResponse = await fetch(httpServer.url, {
+        headers: { Authorization: Credential.serialize(credential) },
+      })
+      expect(authResponse.status).toBe(200)
+
+      httpServer.close()
+    })
+
+    test('behavior: rejects hash credential when challenge supports only pull', async () => {
+      const httpServer = await Http.createServer(async (req, res) => {
+        const result = await Mppx_server.toNodeListener(
+          server.charge({ amount: '1', decimals: 6, supportedModes: ['pull'] }),
+        )(req, res)
+        if (result.status === 402) return
+        res.end('OK')
+      })
+
+      const response = await fetch(httpServer.url)
+      expect(response.status).toBe(402)
+
+      const challenge = Challenge.fromResponse(response, {
+        methods: [tempo_client.charge()],
+      })
+
+      const { receipt } = await Actions.token.transferSync(client, {
+        account: accounts[1],
+        amount: BigInt(challenge.request.amount),
+        to: challenge.request.recipient as Hex.Hex,
+        token: challenge.request.currency as Hex.Hex,
+      })
+
+      const credential = Credential.from({
+        challenge,
+        payload: { hash: receipt.transactionHash, type: 'hash' as const },
+      })
+
+      const rejected = await fetch(httpServer.url, {
+        headers: { Authorization: Credential.serialize(credential) },
+      })
+      expect(rejected.status).toBe(402)
+
+      const body = (await rejected.json()) as { detail: string }
+      expect(body.detail).toContain('Hash credentials are not supported for this challenge.')
+
+      httpServer.close()
+    })
+
+    test('behavior: rejects transaction credential when challenge supports only push', async () => {
+      const httpServer = await Http.createServer(async (req, res) => {
+        const result = await Mppx_server.toNodeListener(
+          server.charge({ amount: '1', decimals: 6, supportedModes: ['push'] }),
+        )(req, res)
+        if (result.status === 402) return
+        res.end('OK')
+      })
+
+      const response = await fetch(httpServer.url)
+      expect(response.status).toBe(402)
+
+      const challenge = Challenge.fromResponse(response, {
+        methods: [tempo_client.charge()],
+      })
+
+      const prepared = await prepareTransactionRequest(client, {
+        account: accounts[1]!,
+        calls: [
+          Actions.token.transfer.call({
+            amount: BigInt(challenge.request.amount),
+            to: challenge.request.recipient as Hex.Hex,
+            token: challenge.request.currency as Hex.Hex,
+          }),
+        ],
+        nonceKey: 'expiring',
+      } as never)
+      prepared.gas = prepared.gas! + 5_000n
+      const signature = await signTransaction(client, prepared as never)
+
+      const credential = Credential.from({
+        challenge,
+        payload: { signature, type: 'transaction' as const },
+      })
+
+      const rejected = await fetch(httpServer.url, {
+        headers: { Authorization: Credential.serialize(credential) },
+      })
+      expect(rejected.status).toBe(402)
+
+      const body = (await rejected.json()) as { detail: string }
+      expect(body.detail).toContain('Transaction credentials are not supported for this challenge.')
 
       httpServer.close()
     })
@@ -3115,6 +3275,31 @@ describe('tempo', () => {
         methods: [tempo_client.charge()],
       })
       expect(challenge.request.currency).toBe(asset)
+    })
+
+    test('challenge contains supportedModes when configured', async () => {
+      const handler = Mppx_server.create({
+        methods: [
+          tempo_server.charge({
+            getClient: () => client,
+            account: accounts[0].address,
+            currency: asset,
+          }),
+        ],
+        realm,
+        secretKey,
+      })
+
+      const result = await handler.charge({ amount: '1', supportedModes: ['pull'] })(
+        new Request('https://example.com'),
+      )
+      expect(result.status).toBe(402)
+      if (result.status !== 402) throw new Error()
+
+      const challenge = Challenge.fromResponse(result.challenge, {
+        methods: [tempo_client.charge()],
+      })
+      expect(challenge.request.methodDetails?.supportedModes).toEqual(['pull'])
     })
   })
 
