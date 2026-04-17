@@ -45,6 +45,7 @@ import {
 } from '../internal/defaults.js'
 import type * as Methods from '../Methods.js'
 import * as ChannelStore from '../session/ChannelStore.js'
+import { deserializeSessionReceipt } from '../session/Receipt.js'
 import type { SessionReceipt } from '../session/Types.js'
 import { signVoucher } from '../session/Voucher.js'
 import * as TempoWs from '../session/Ws.js'
@@ -2747,6 +2748,219 @@ describe.runIf(isLocalnet)('session', () => {
       expect(second.challenge.headers.get('Payment-Receipt')).toBeNull()
     })
 
+    test('default HTTP GET flow does not serve a replayed voucher without advancing accounting', async () => {
+      const { channelId, serializedTransaction } = await createSignedOpenTransaction(10000000n)
+      const signature = await signTestVoucher(channelId, 1000000n)
+      const handler = createHandler()
+      const route = handler.session({
+        amount: '1',
+        decimals: 6,
+        unitType: 'token',
+      })
+
+      const serve = async (request: Request) => {
+        const result = await route(request)
+        if (result.status === 402) return result.challenge
+        return result.withReceipt(new Response('paid-content'))
+      }
+
+      const issueChallenge = () => route(new Request('https://api.example.com/resource'))
+
+      const first = await issueChallenge()
+      expect(first.status).toBe(402)
+      if (first.status !== 402) throw new Error('expected challenge')
+
+      const open = await serve(
+        new Request('https://api.example.com/resource', {
+          headers: {
+            Authorization: Credential.serialize({
+              challenge: Challenge.fromResponse(first.challenge),
+              payload: {
+                action: 'open',
+                type: 'transaction',
+                channelId,
+                transaction: serializedTransaction,
+                cumulativeAmount: '1000000',
+                signature,
+              },
+            }),
+          },
+        }),
+      )
+      expect(open.status).toBe(200)
+      expect(await open.text()).toBe('paid-content')
+      const openReceipt = deserializeSessionReceipt(open.headers.get('Payment-Receipt') as string)
+      expect(openReceipt.acceptedCumulative).toBe('1000000')
+      expect(openReceipt.spent).toBe('1000000')
+      expect(openReceipt.units).toBe(1)
+
+      const replayChallenge = await issueChallenge()
+      expect(replayChallenge.status).toBe(402)
+      if (replayChallenge.status !== 402) throw new Error('expected challenge')
+
+      const replay = await serve(
+        new Request('https://api.example.com/resource', {
+          headers: {
+            Authorization: Credential.serialize({
+              challenge: Challenge.fromResponse(replayChallenge.challenge),
+              payload: {
+                action: 'voucher',
+                channelId,
+                cumulativeAmount: '1000000',
+                signature,
+              },
+            }),
+          },
+        }),
+      )
+      expect(replay.status).toBe(402)
+      expect(replay.headers.get('Payment-Receipt')).toBeNull()
+    })
+
+    test('default HTTP POST content flow does not serve a replayed voucher without advancing accounting', async () => {
+      const { channelId, serializedTransaction } = await createSignedOpenTransaction(10000000n)
+      const signature = await signTestVoucher(channelId, 1000000n)
+      const handler = createHandler()
+      const route = handler.session({
+        amount: '1',
+        decimals: 6,
+        unitType: 'token',
+      })
+
+      const serve = async (request: Request) => {
+        const result = await route(request)
+        if (result.status === 402) return result.challenge
+        return result.withReceipt(new Response('paid-content'))
+      }
+
+      const makeRequest = (authorization?: string) =>
+        new Request('https://api.example.com/resource', {
+          method: 'POST',
+          body: '{}',
+          headers: {
+            'content-length': '2',
+            'content-type': 'application/json',
+            ...(authorization ? { Authorization: authorization } : {}),
+          },
+        })
+
+      const first = await route(makeRequest())
+      expect(first.status).toBe(402)
+      if (first.status !== 402) throw new Error('expected challenge')
+
+      const open = await serve(
+        makeRequest(
+          Credential.serialize({
+            challenge: Challenge.fromResponse(first.challenge),
+            payload: {
+              action: 'open',
+              type: 'transaction',
+              channelId,
+              transaction: serializedTransaction,
+              cumulativeAmount: '1000000',
+              signature,
+            },
+          }),
+        ),
+      )
+      expect(open.status).toBe(200)
+      expect(await open.text()).toBe('paid-content')
+      const openReceipt = deserializeSessionReceipt(open.headers.get('Payment-Receipt') as string)
+      expect(openReceipt.acceptedCumulative).toBe('1000000')
+      expect(openReceipt.spent).toBe('1000000')
+      expect(openReceipt.units).toBe(1)
+
+      const replayChallenge = await route(makeRequest())
+      expect(replayChallenge.status).toBe(402)
+      if (replayChallenge.status !== 402) throw new Error('expected challenge')
+
+      const replay = await serve(
+        makeRequest(
+          Credential.serialize({
+            challenge: Challenge.fromResponse(replayChallenge.challenge),
+            payload: {
+              action: 'voucher',
+              channelId,
+              cumulativeAmount: '1000000',
+              signature,
+            },
+          }),
+        ),
+      )
+      expect(replay.status).toBe(402)
+      expect(replay.headers.get('Payment-Receipt')).toBeNull()
+    })
+
+    test('default HTTP POST content flow with body and no body headers does not serve a replayed voucher', async () => {
+      const { channelId, serializedTransaction } = await createSignedOpenTransaction(10000000n)
+      const signature = await signTestVoucher(channelId, 1000000n)
+      const handler = createHandler()
+      const route = handler.session({
+        amount: '1',
+        decimals: 6,
+        unitType: 'token',
+      })
+
+      const serve = async (request: Request) => {
+        const result = await route(request)
+        if (result.status === 402) return result.challenge
+        return result.withReceipt(new Response('paid-content'))
+      }
+
+      const makeRequest = (authorization?: string) =>
+        new Request('https://api.example.com/resource', {
+          method: 'POST',
+          body: '{}',
+          ...(authorization ? { headers: { Authorization: authorization } } : {}),
+        })
+
+      const first = await route(makeRequest())
+      expect(first.status).toBe(402)
+      if (first.status !== 402) throw new Error('expected challenge')
+
+      const open = await serve(
+        makeRequest(
+          Credential.serialize({
+            challenge: Challenge.fromResponse(first.challenge),
+            payload: {
+              action: 'open',
+              type: 'transaction',
+              channelId,
+              transaction: serializedTransaction,
+              cumulativeAmount: '1000000',
+              signature,
+            },
+          }),
+        ),
+      )
+      expect(open.status).toBe(200)
+      expect(await open.text()).toBe('paid-content')
+      const openReceipt = deserializeSessionReceipt(open.headers.get('Payment-Receipt') as string)
+      expect(openReceipt.acceptedCumulative).toBe('1000000')
+      expect(openReceipt.spent).toBe('1000000')
+      expect(openReceipt.units).toBe(1)
+
+      const replayChallenge = await route(makeRequest())
+      expect(replayChallenge.status).toBe(402)
+      if (replayChallenge.status !== 402) throw new Error('expected challenge')
+
+      const replay = await serve(
+        makeRequest(
+          Credential.serialize({
+            challenge: Challenge.fromResponse(replayChallenge.challenge),
+            payload: {
+              action: 'voucher',
+              channelId,
+              cumulativeAmount: '1000000',
+              signature,
+            },
+          }),
+        ),
+      )
+      expect(replay.status).toBe(402)
+      expect(replay.headers.get('Payment-Receipt')).toBeNull()
+    })
+
     test('converts amount/suggestedDeposit/minVoucherDelta with decimals=18', async () => {
       const handler = createHandler()
       const route = handler.session({
@@ -2963,6 +3177,23 @@ describe.runIf(isLocalnet)('session', () => {
       expect(result).toBeUndefined()
     })
 
+    test('returns undefined for open POST with body and no body headers (content request)', () => {
+      const server = createServer()
+      const result = server.respond!({
+        credential: {
+          challenge: makeChallenge({
+            channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
+          }),
+          payload: { action: 'open' },
+        },
+        input: new Request('http://localhost', {
+          method: 'POST',
+          body: '{}',
+        }),
+      } as any)
+      expect(result).toBeUndefined()
+    })
+
     test('returns 204 for GET with topUp action', () => {
       const server = createServer()
       const result = server.respond!({
@@ -3007,6 +3238,23 @@ describe.runIf(isLocalnet)('session', () => {
         input: new Request('http://localhost', {
           method: 'POST',
           headers: { 'transfer-encoding': 'chunked' },
+        }),
+      } as any)
+      expect(result).toBeUndefined()
+    })
+
+    test('returns undefined for voucher POST with body and no body headers (content request)', () => {
+      const server = createServer()
+      const result = server.respond!({
+        credential: {
+          challenge: makeChallenge({
+            channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
+          }),
+          payload: { action: 'voucher' },
+        },
+        input: new Request('http://localhost', {
+          method: 'POST',
+          body: '{}',
         }),
       } as any)
       expect(result).toBeUndefined()

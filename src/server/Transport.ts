@@ -125,6 +125,7 @@ export function http(): Http {
 
     captureRequest(request) {
       return {
+        hasBody: request.body !== null,
         headers: new Headers(request.headers),
         method: request.method,
         url: safeUrl(request.url),
@@ -221,6 +222,7 @@ export function mcp() {
 
     captureRequest(request) {
       return {
+        hasBody: false,
         headers: new Headers(),
         method: 'POST',
         url: new URL(`mcp://request/${encodeURIComponent(request.method ?? 'unknown')}`),

@@ -181,7 +181,7 @@ export function session<const parameters extends session.Parameters>(
       }
     },
 
-    async verify({ credential, request }) {
+    async verify({ credential, envelope, request }) {
       const { challenge, payload } = credential as Credential.Credential<SessionCredentialPayload>
 
       const resolvedRequest = Methods.session.schema.request.parse(request)
@@ -255,6 +255,28 @@ export function session<const parameters extends session.Parameters>(
           })
       }
 
+      // In the default HTTP request/response mode, each successful content
+      // request consumes one unit immediately after the credential is accepted.
+      // This keeps equal-voucher replays bounded by the voucher's remaining
+      // balance instead of serving repeated responses for free.
+      if (
+        !parameters.sse &&
+        envelope &&
+        isBillableContentRequest(envelope.capturedRequest) &&
+        (payload.action === 'open' || payload.action === 'voucher')
+      ) {
+        const charged = await charge(
+          store,
+          sessionReceipt.channelId,
+          BigInt(resolvedRequest.amount),
+        )
+        sessionReceipt = {
+          ...sessionReceipt,
+          spent: charged.spent.toString(),
+          units: charged.units,
+        }
+      }
+
       return sessionReceipt
     },
 
@@ -281,9 +303,7 @@ export function session<const parameters extends session.Parameters>(
       // POSTs with a body are content requests — fall through so the
       // upstream response is returned to the client.
       if (input.method === 'POST') {
-        const contentLength = input.headers.get('content-length')
-        if (contentLength !== null && contentLength !== '0') return undefined
-        if (input.headers.has('transfer-encoding')) return undefined
+        if (hasRequestBody(input)) return undefined
         return new Response(null, { status: 204 })
       }
       return undefined
@@ -450,6 +470,38 @@ function validateOnChainChannel(
       reason: 'channel available balance insufficient for requested amount',
     })
   }
+}
+
+function isBillableContentRequest(input: {
+  hasBody?: boolean | undefined
+  headers: Headers
+  method: string
+}): boolean {
+  if (input.method === 'POST') return hasCapturedRequestBody(input)
+
+  if (input.method === 'HEAD') return false
+
+  return true
+}
+
+function hasCapturedRequestBody(input: {
+  hasBody?: boolean | undefined
+  headers: Headers
+}): boolean {
+  const contentLength = input.headers.get('content-length')
+  const headerIndicatesBody =
+    (contentLength !== null && contentLength !== '0') || input.headers.has('transfer-encoding')
+
+  if (input.hasBody === true) return true
+  return headerIndicatesBody
+}
+
+function hasRequestBody(input: Request): boolean {
+  return (
+    input.body !== null ||
+    input.headers.has('transfer-encoding') ||
+    (input.headers.get('content-length') !== null && input.headers.get('content-length') !== '0')
+  )
 }
 
 /**

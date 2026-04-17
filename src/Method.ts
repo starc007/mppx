@@ -69,6 +69,7 @@ export type AnyClient = Client<any, any>
 
 /** Transport-captured request metadata used as the authoritative request snapshot. */
 export type CapturedRequest = {
+  readonly hasBody?: boolean | undefined
   readonly headers: Headers
   readonly method: string
   readonly url: URL

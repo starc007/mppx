@@ -41,6 +41,7 @@ export function sse(options: sse.Options & { store: ChannelStore.ChannelStore })
     captureRequest(request) {
       return (
         base.captureRequest?.(request) ?? {
+          hasBody: request.body !== null,
           headers: new Headers(request.headers),
           method: request.method,
           url: new URL(request.url),
