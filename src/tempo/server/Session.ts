@@ -37,6 +37,7 @@ import * as Store from '../../Store.js'
 import * as Client from '../../viem/Client.js'
 import * as Account from '../internal/account.js'
 import * as defaults from '../internal/defaults.js'
+import * as FeePayer from '../internal/fee-payer.js'
 import type * as types from '../internal/types.js'
 import * as Methods from '../Methods.js'
 import {
@@ -92,6 +93,7 @@ export function session<const parameters extends session.Parameters>(
     channelStateTtl = 5_000,
     currency = defaults.resolveCurrency(parameters),
     decimals = defaults.decimals,
+    feePayerPolicy,
     store: rawStore = Store.memory(),
     suggestedDeposit,
     unitType,
@@ -203,9 +205,10 @@ export function session<const parameters extends session.Parameters>(
             payload,
             methodDetails,
             resolvedFeePayer,
+            feePayerPolicy,
             waitForConfirmation,
           )
-          lastOnChainVerified.set(payload.channelId, Date.now())
+          lastOnChainVerified.set(sessionReceipt.channelId, Date.now())
           break
 
         case 'topUp':
@@ -216,8 +219,9 @@ export function session<const parameters extends session.Parameters>(
             payload,
             methodDetails,
             resolvedFeePayer,
+            feePayerPolicy,
           )
-          lastOnChainVerified.set(payload.channelId, Date.now())
+          lastOnChainVerified.set(sessionReceipt.channelId, Date.now())
           break
 
         case 'voucher':
@@ -293,9 +297,13 @@ export declare namespace session {
     'feePayer' | 'recipient'
   >
 
+  type FeePayerPolicy = Partial<FeePayer.Policy>
+
   type Parameters = {
     /** TTL in milliseconds for cached on-chain channel state. After this duration, the server re-queries on-chain state during voucher handling to detect forced close requests. @default 5_000 */
     channelStateTtl?: number | undefined
+    /** Override the fee-sponsor policy used for sponsored open/topUp transactions. */
+    feePayerPolicy?: FeePayerPolicy | undefined
     /** Minimum voucher delta to accept (numeric string, default: "0"). */
     minVoucherDelta?: string | undefined
     /**
@@ -561,13 +569,11 @@ async function handleOpen(
   payload: SessionCredentialPayload & { action: 'open' },
   methodDetails: SessionMethodDetails,
   feePayer: viem_Account | undefined,
+  feePayerPolicy: session.FeePayerPolicy | undefined,
   waitForConfirmation: boolean,
 ): Promise<SessionReceipt> {
-  const voucher = parseVoucherFromPayload(
-    payload.channelId,
-    payload.cumulativeAmount,
-    payload.signature,
-  )
+  const channelId = ChannelStore.normalizeChannelId(payload.channelId)
+  const voucher = parseVoucherFromPayload(channelId, payload.cumulativeAmount, payload.signature)
 
   const recipient = challenge.request.recipient as Address
   const currency = challenge.request.currency as Address
@@ -577,9 +583,11 @@ async function handleOpen(
     client,
     serializedTransaction: payload.transaction,
     escrowContract: methodDetails.escrowContract,
-    channelId: payload.channelId,
+    channelId,
     recipient,
     currency,
+    challengeExpires: challenge.expires,
+    feePayerPolicy,
     feePayer,
     waitForConfirmation,
   })
@@ -612,7 +620,7 @@ async function handleOpen(
     throw new InvalidSignatureError({ reason: 'invalid voucher signature' })
   }
 
-  const updated = await store.updateChannel(payload.channelId, (existing) => {
+  const updated = await store.updateChannel(channelId, (existing) => {
     if (existing) {
       if (voucher.cumulativeAmount <= existing.settledOnChain) {
         throw new VerificationFailedError({
@@ -644,7 +652,7 @@ async function handleOpen(
       }
     }
     return {
-      channelId: payload.channelId,
+      channelId,
       chainId: methodDetails.chainId,
       escrowContract: methodDetails.escrowContract,
       closeRequestedAt: onChain.closeRequestedAt,
@@ -667,7 +675,7 @@ async function handleOpen(
 
   return createSessionReceipt({
     challengeId: challenge.id,
-    channelId: payload.channelId,
+    channelId: updated.channelId,
     acceptedCumulative: updated.highestVoucherAmount,
     spent: updated.spent,
     units: updated.units,
@@ -689,8 +697,10 @@ async function handleTopUp(
   payload: SessionCredentialPayload & { action: 'topUp' },
   methodDetails: SessionMethodDetails,
   feePayer: viem_Account | undefined,
+  feePayerPolicy: session.FeePayerPolicy | undefined,
 ): Promise<SessionReceipt> {
-  const channel = await store.getChannel(payload.channelId)
+  const channelId = ChannelStore.normalizeChannelId(payload.channelId)
+  const channel = await store.getChannel(channelId)
   if (!channel) {
     throw new ChannelNotFoundError({ reason: 'channel not found' })
   }
@@ -701,21 +711,23 @@ async function handleTopUp(
     client,
     serializedTransaction: payload.transaction,
     escrowContract: methodDetails.escrowContract,
-    channelId: payload.channelId,
+    channelId,
     currency: challenge.request.currency as Address,
     declaredDeposit,
     previousDeposit: channel.deposit,
+    challengeExpires: challenge.expires,
+    feePayerPolicy,
     feePayer,
   })
 
-  const updated = await store.updateChannel(payload.channelId, (current) => {
+  const updated = await store.updateChannel(channelId, (current) => {
     if (!current) throw new ChannelNotFoundError({ reason: 'channel not found' })
     return { ...current, deposit: onChainDeposit }
   })
 
   return createSessionReceipt({
     challengeId: challenge.id,
-    channelId: payload.channelId,
+    channelId: updated?.channelId ?? channel.channelId,
     acceptedCumulative: updated?.highestVoucherAmount ?? channel.highestVoucherAmount,
     spent: updated?.spent ?? channel.spent,
     units: updated?.units ?? channel.units,
@@ -735,7 +747,8 @@ async function handleVoucher(
   channelStateTtl: number,
   lastOnChainVerified: Map<Hex, number>,
 ): Promise<SessionReceipt> {
-  const channel = await store.getChannel(payload.channelId)
+  const channelId = ChannelStore.normalizeChannelId(payload.channelId)
+  const channel = await store.getChannel(channelId)
   if (!channel) {
     throw new ChannelNotFoundError({ reason: 'channel not found' })
   }
@@ -743,11 +756,7 @@ async function handleVoucher(
     throw new ChannelClosedError({ reason: 'channel is finalized' })
   }
 
-  const voucher = parseVoucherFromPayload(
-    payload.channelId,
-    payload.cumulativeAmount,
-    payload.signature,
-  )
+  const voucher = parseVoucherFromPayload(channelId, payload.cumulativeAmount, payload.signature)
 
   // Use locally-stored channel state as a trusted cache instead of
   // reading on-chain for every voucher. The on-chain state is verified
@@ -759,7 +768,7 @@ async function handleVoucher(
   // To guard against the payer initiating a forced close while vouchers
   // are still being accepted, re-query on-chain state when the cache
   // exceeds the configured staleness TTL (default: 5s).
-  const lastVerified = lastOnChainVerified.get(payload.channelId) ?? 0
+  const lastVerified = lastOnChainVerified.get(channelId) ?? 0
   const isStale = Date.now() - lastVerified > channelStateTtl
 
   const onChain = await (async () => {
@@ -767,13 +776,13 @@ async function handleVoucher(
       const onChainChannel = await getOnChainChannel(
         client,
         methodDetails.escrowContract,
-        payload.channelId,
+        channelId,
       )
-      lastOnChainVerified.set(payload.channelId, Date.now())
+      lastOnChainVerified.set(channelId, Date.now())
       // Persist closeRequestedAt so the cached path detects force-close
       // between re-queries.
       if (onChainChannel.closeRequestedAt !== 0n) {
-        await store.updateChannel(payload.channelId, (current) =>
+        await store.updateChannel(channelId, (current) =>
           current ? { ...current, closeRequestedAt: onChainChannel.closeRequestedAt } : current,
         )
       }
@@ -796,7 +805,7 @@ async function handleVoucher(
     minVoucherDelta,
     challenge,
     channel,
-    channelId: payload.channelId,
+    channelId,
     voucher,
     onChain,
     methodDetails,
@@ -815,7 +824,8 @@ async function handleClose(
   account?: viem_Account,
   feePayer?: viem_Account,
 ): Promise<SessionReceipt> {
-  const channel = await store.getChannel(payload.channelId)
+  const channelId = ChannelStore.normalizeChannelId(payload.channelId)
+  const channel = await store.getChannel(channelId)
   if (!channel) {
     throw new ChannelNotFoundError({ reason: 'channel not found' })
   }
@@ -823,13 +833,9 @@ async function handleClose(
     throw new ChannelClosedError({ reason: 'channel is already finalized' })
   }
 
-  const voucher = parseVoucherFromPayload(
-    payload.channelId,
-    payload.cumulativeAmount,
-    payload.signature,
-  )
+  const voucher = parseVoucherFromPayload(channelId, payload.cumulativeAmount, payload.signature)
 
-  const onChain = await getOnChainChannel(client, methodDetails.escrowContract, payload.channelId)
+  const onChain = await getOnChainChannel(client, methodDetails.escrowContract, channelId)
 
   if (onChain.finalized) {
     throw new ChannelClosedError({ reason: 'channel is finalized on-chain' })
@@ -867,7 +873,7 @@ async function handleClose(
     ...(feePayer && account ? { feePayer, account } : { account }),
   })
 
-  const updated = await store.updateChannel(payload.channelId, (current) => {
+  const updated = await store.updateChannel(channelId, (current) => {
     if (!current) return null
     const updateVoucher = voucher.cumulativeAmount > current.highestVoucherAmount
     return {
@@ -883,7 +889,7 @@ async function handleClose(
 
   return createSessionReceipt({
     challengeId: challenge.id,
-    channelId: payload.channelId,
+    channelId: updated?.channelId ?? channel.channelId,
     acceptedCumulative: voucher.cumulativeAmount,
     spent: updated?.spent ?? channel.spent,
     units: updated?.units ?? channel.units,

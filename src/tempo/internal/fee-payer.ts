@@ -98,14 +98,25 @@ export function validateCalls(
     throw new FeePayerValidationError('disallowed call pattern in fee-payer transaction', details)
   }
 
-  // Validate approve spender and buy target are the DEX.
+  // Bind the swap approval to the token the DEX call will actually spend.
+  const buyCall = calls.find((c) => c.data?.slice(0, 10) === Selectors.swapExactAmountOut)
+  const buyArgs = buyCall
+    ? (decodeFunctionData({ abi: Abis.stablecoinDex, data: buyCall.data! }).args as [
+        `0x${string}`,
+        `0x${string}`,
+        bigint,
+        bigint,
+      ])
+    : undefined
+
   const approveCall = calls.find((c) => c.data?.slice(0, 10) === Selectors.approve)
   if (approveCall) {
     const { args } = decodeFunctionData({ abi: Abis.tip20, data: approveCall.data! })
+    if (!approveCall.to || (buyArgs && !TempoAddress_internal.isEqual(approveCall.to, buyArgs[0])))
+      throw new FeePayerValidationError('approve target does not match swap tokenIn', details)
     if (!TempoAddress_internal.isEqual((args as [`0x${string}`])[0]!, Addresses.stablecoinDex))
       throw new FeePayerValidationError('approve spender is not the DEX', details)
   }
-  const buyCall = calls.find((c) => c.data?.slice(0, 10) === Selectors.swapExactAmountOut)
   if (
     buyCall &&
     (!buyCall.to || !TempoAddress_internal.isEqual(buyCall.to, Addresses.stablecoinDex))

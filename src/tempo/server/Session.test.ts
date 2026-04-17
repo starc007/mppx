@@ -149,6 +149,40 @@ describe.runIf(isLocalnet)('session', () => {
       expect(ch!.highestVoucherAmount).toBe(1000000n)
     })
 
+    test('fee-payer policy override is enforced for sponsored open', async () => {
+      const salt = nextSalt()
+      const { channelId, serializedTransaction } = await signOpenChannel({
+        escrow: escrowContract,
+        payer,
+        payee: recipient,
+        token: currency,
+        deposit: 10000000n,
+        salt,
+        feePayer: true,
+      })
+      const server = createServer({
+        feePayer: recipientAccount,
+        feePayerPolicy: { maxGas: 1n },
+      })
+
+      await expect(
+        server.verify({
+          credential: {
+            challenge: makeChallenge({ channelId }),
+            payload: {
+              action: 'open' as const,
+              type: 'transaction' as const,
+              channelId,
+              transaction: serializedTransaction,
+              cumulativeAmount: '1000000',
+              signature: await signTestVoucher(channelId, 1000000n),
+            },
+          },
+          request: makeRequest({ feePayer: true }),
+        }),
+      ).rejects.toThrow('gas exceeds sponsor policy')
+    })
+
     test('rejects open when payee mismatch', async () => {
       const wrongPayee = accounts[3].address
       const { channelId, serializedTransaction } = await createSignedOpenTransaction(10000000n, {
@@ -297,6 +331,66 @@ describe.runIf(isLocalnet)('session', () => {
       expect(receipt.status).toBe('success')
       const ch = await store.getChannel(channelId)
       expect(ch!.highestVoucherAmount).toBe(1000000n)
+    })
+
+    test('reopen with a case-variant channelId does not reset available balance', async () => {
+      let open:
+        | {
+            channelId: Hex
+            serializedTransaction: Hex
+          }
+        | undefined
+      for (let i = 0; i < 10; i++) {
+        const candidate = await createSignedOpenTransaction(10000000n)
+        if (/[a-f]/.test(candidate.channelId)) {
+          open = candidate
+          break
+        }
+      }
+      if (!open) throw new Error('failed to generate channelId with alphabetic hex characters')
+
+      const { channelId, serializedTransaction } = open
+      const caseVariantChannelId = channelId.replace(/[a-f]/, (character) =>
+        character.toUpperCase(),
+      ) as Hex
+      const server = createServer()
+
+      await server.verify({
+        credential: {
+          challenge: makeChallenge({ id: 'open-1', channelId }),
+          payload: {
+            action: 'open' as const,
+            type: 'transaction' as const,
+            channelId,
+            transaction: serializedTransaction,
+            cumulativeAmount: '5000000',
+            signature: await signTestVoucher(channelId, 5000000n),
+          },
+        },
+        request: makeRequest(),
+      })
+
+      await charge(store, channelId, 4000000n)
+
+      const reopenReceipt = (await server.verify({
+        credential: {
+          challenge: makeChallenge({ id: 'open-2', channelId: caseVariantChannelId }),
+          payload: {
+            action: 'open' as const,
+            type: 'transaction' as const,
+            channelId: caseVariantChannelId,
+            transaction: serializedTransaction,
+            cumulativeAmount: '5000000',
+            signature: await signTestVoucher(caseVariantChannelId, 5000000n),
+          },
+        },
+        request: makeRequest(),
+      })) as SessionReceipt
+
+      expect(reopenReceipt.spent).toBe('4000000')
+      await expect(charge(store, caseVariantChannelId, 2000000n)).rejects.toThrow(
+        'requested 2000000, available 1000000',
+      )
     })
 
     test('rejects voucher below settledOnChain', async () => {
@@ -1034,6 +1128,40 @@ describe.runIf(isLocalnet)('session', () => {
 
       const ch = await store.getChannel(channelId)
       expect(ch!.deposit).toBe(20000000n)
+    })
+
+    test('fee-payer policy override is enforced for sponsored topUp', async () => {
+      const { channelId, serializedTransaction } = await createSignedOpenTransaction(10000000n)
+      const server = createServer({
+        feePayer: recipientAccount,
+        feePayerPolicy: { maxGas: 1n },
+      })
+      await openServerChannel(server, channelId, serializedTransaction)
+
+      const { serializedTransaction: topUpTx } = await signTopUpChannel({
+        escrow: escrowContract,
+        payer,
+        channelId,
+        token: currency,
+        amount: 10000000n,
+        feePayer: true,
+      })
+
+      await expect(
+        server.verify({
+          credential: {
+            challenge: makeChallenge({ id: 'challenge-topup-policy', channelId }),
+            payload: {
+              action: 'topUp' as const,
+              type: 'transaction' as const,
+              channelId,
+              transaction: topUpTx,
+              additionalDeposit: '10000000',
+            },
+          },
+          request: makeRequest({ feePayer: true }),
+        }),
+      ).rejects.toThrow('gas exceeds sponsor policy')
     })
 
     test('topUp receipt preserves spent and units from prior charges', async () => {
@@ -4514,7 +4642,7 @@ function makeChallenge(opts: { id?: string; channelId: Hex }) {
   } as Challenge.Challenge<z.output<typeof Methods.session.schema.request>, 'session', 'tempo'>
 }
 
-function makeRequest() {
+function makeRequest(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     amount: '1000000',
     unitType: 'token',
@@ -4523,6 +4651,7 @@ function makeRequest() {
     recipient: recipient as string,
     escrowContract: escrowContract as string,
     chainId: chain.id,
+    ...overrides,
   }
 }
 
