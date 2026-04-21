@@ -1,5 +1,11 @@
 # mppx
 
+## 0.6.1
+
+### Patch Changes
+
+- Fixed cross-route credential replay checks by binding `unitType` and allowing `verifyCredential()` to validate credentials against expected route context.
+
 ## 0.6.0
 
 ### Minor Changes

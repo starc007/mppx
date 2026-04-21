@@ -92,9 +92,13 @@ export type Mppx<
      * ```ts
      * const receipt = await mppx.verifyCredential('eyJjaGFsbGVuZ2...')
      * const receipt = await mppx.verifyCredential(credential)
+     * const receipt = await mppx.verifyCredential(credential, { request: { amount: '1000' } })
      * ```
      */
-    verifyCredential(credential: string | Credential.Credential): Promise<Receipt.Receipt>
+    verifyCredential(
+      credential: string | Credential.Credential,
+      options?: VerifyCredentialOptions | undefined,
+    ): Promise<Receipt.Receipt>
   }
 
 /** Extracts the transport override from a method, if any. */
@@ -176,6 +180,13 @@ type ChallengeFn<method extends Method.Method, defaults extends Record<string, u
   options: MethodFn.Options<method, defaults>,
 ) => Promise<Challenge.Challenge>
 
+export type VerifyCredentialOptions = {
+  capturedRequest?: Method.CapturedRequest | undefined
+  meta?: Record<string, string> | undefined
+  realm?: string | undefined
+  request?: Record<string, unknown> | undefined
+}
+
 /**
  * Creates a server-side payment handler from methods.
  *
@@ -256,6 +267,7 @@ export function create<
   // verifyCredential: single-call end-to-end verification
   async function verifyCredentialFn(
     input: string | Credential.Credential,
+    options?: VerifyCredentialOptions,
   ): Promise<Receipt.Receipt> {
     const credential = typeof input === 'string' ? Credential.deserialize(input) : input
 
@@ -283,11 +295,46 @@ export function create<
     // Validate payload against method schema
     mi.schema.credential.payload.parse(credential.payload)
 
-    // The challenge already contains the request params (HMAC-bound),
-    // so we use them directly — no need for the caller to re-supply.
-    const request = credential.challenge.request as z.input<typeof mi.schema.request>
+    const shouldValidateRoute =
+      options?.capturedRequest !== undefined ||
+      options?.meta !== undefined ||
+      options?.realm !== undefined ||
+      options?.request !== undefined
 
-    return mi.verify({ credential, request } as never)
+    const request = shouldValidateRoute
+      ? await resolveRouteChallenge({
+          capturedRequest: options?.capturedRequest,
+          credential,
+          defaults: mi.defaults,
+          expires: credential.challenge.expires,
+          meta: options?.meta,
+          method: mi,
+          realm: options?.realm ?? realm,
+          request: mi.request as never,
+          routeRequest: options?.request ?? {},
+          secretKey: secretKey!,
+        }).then((resolved) => {
+          const mismatch = getPinnedChallengeMismatch(resolved.challenge, credential.challenge)
+          if (mismatch)
+            throw new Errors.InvalidChallengeError({
+              id: credential.challenge.id,
+              reason: `credential ${mismatch} does not match this route's requirements`,
+            })
+
+          return resolved.request as z.input<typeof mi.schema.request>
+        })
+      : (credential.challenge.request as z.input<typeof mi.schema.request>)
+
+    const envelope = options?.capturedRequest
+      ? ({
+          capturedRequest: options.capturedRequest,
+          challenge: credential.challenge,
+          credential,
+          request,
+        } as Method.VerifiedChallengeEnvelope)
+      : undefined
+
+    return mi.verify({ credential, envelope, request } as never)
   }
 
   function composeFn(
@@ -353,7 +400,6 @@ function createMethodFn(parameters: createMethodFn.Parameters): createMethodFn.R
 
   return (options) => {
     const { description, meta, ...rest } = options
-    const merged = { ...defaults, ...rest }
 
     return Object.assign(
       async (input: Transport.InputOf): Promise<MethodFn.Response> => {
@@ -372,26 +418,17 @@ function createMethodFn(parameters: createMethodFn.Parameters): createMethodFn.R
             return [null, e as Error] as const
           }
         })()
-
-        // Transform request if method provides a `request` function.
-        const request = (
-          parameters.request
-            ? await parameters.request({ capturedRequest, credential, request: merged } as never)
-            : merged
-        ) as never
-
-        // Resolve realm: explicit > env var > request Host header.
-        const effectiveRealm = realm ?? resolveRealmFromCapturedRequest(capturedRequest)
-
-        // Recompute challenge from options. The HMAC-bound ID means we don't need to
-        // store challenges server-side—if the client echoes back a credential with
-        // a matching ID, we know it was issued by us with these exact parameters.
-        const challenge = Challenge.fromMethod(method, {
+        const { challenge, request } = await resolveRouteChallenge({
+          capturedRequest,
+          credential,
+          defaults,
           description,
           expires,
           meta,
-          realm: effectiveRealm,
-          request,
+          method,
+          realm,
+          request: parameters.request,
+          routeRequest: rest,
           secretKey,
         })
 
@@ -507,6 +544,7 @@ function createMethodFn(parameters: createMethodFn.Parameters): createMethodFn.R
           capturedRequest,
           challenge: credential.challenge,
           credential,
+          request,
         })
 
         // User-provided verification (e.g., check signature, submit tx, verify payment).
@@ -567,7 +605,7 @@ function createMethodFn(parameters: createMethodFn.Parameters): createMethodFn.R
           ...options,
           name: method.name,
           intent: method.intent,
-          _canonicalRequest: PaymentRequest.fromMethod(method, merged),
+          _canonicalRequest: PaymentRequest.fromMethod(method, { ...defaults, ...rest }),
         },
       },
     )
@@ -595,29 +633,20 @@ function createChallengeFn(parameters: {
       meta?: Record<string, string>
       [key: string]: unknown
     }
-    const merged = { ...defaults, ...rest }
     const expires =
       'expires' in options ? (options.expires as string | undefined) : Expires.minutes(5)
 
-    // Transform request if method provides a `request` function.
-    const request = (
-      parameters.request
-        ? await (parameters.request as (opts: { request: unknown }) => unknown)({
-            request: merged,
-          })
-        : merged
-    ) as never
-
-    const effectiveRealm = realm ?? defaultRealm
-
-    return Challenge.fromMethod(method, {
+    return resolveRouteChallenge({
+      defaults,
       description,
       expires,
       meta,
-      realm: effectiveRealm,
-      request,
+      method,
+      realm,
+      request: parameters.request,
+      routeRequest: rest,
       secretKey,
-    })
+    }).then((resolved) => resolved.challenge)
   }
 }
 
@@ -676,6 +705,55 @@ function resolveRealmFromCapturedRequest(capturedRequest: Method.CapturedRequest
   return defaultRealm
 }
 
+async function resolveRouteChallenge(parameters: {
+  capturedRequest?: Method.CapturedRequest | undefined
+  credential?: Credential.Credential | null | undefined
+  defaults?: Record<string, unknown> | undefined
+  description?: string | undefined
+  expires?: string | undefined
+  meta?: Record<string, string> | undefined
+  method: Method.Method
+  realm?: string | undefined
+  request?: Method.RequestFn<Method.Method> | undefined
+  routeRequest: Record<string, unknown>
+  secretKey: string
+}): Promise<{
+  challenge: Challenge.Challenge
+  request: Record<string, unknown>
+}> {
+  // Resolve the route's canonical request exactly as the handler path does:
+  const request = await (async () => {
+    // start from defaults + route options, then let the method request hook
+    const merged = { ...parameters.defaults, ...parameters.routeRequest }
+    // normalize or enrich it using the captured request and credential.
+    return parameters.request
+      ? ((await parameters.request({
+          capturedRequest: parameters.capturedRequest,
+          credential: parameters.credential,
+          request: merged,
+        } as never)) as Record<string, unknown>)
+      : merged
+  })()
+
+  const effectiveRealm =
+    parameters.realm ??
+    (parameters.capturedRequest
+      ? resolveRealmFromCapturedRequest(parameters.capturedRequest)
+      : defaultRealm)
+
+  return {
+    challenge: Challenge.fromMethod(parameters.method, {
+      description: parameters.description,
+      expires: parameters.expires,
+      meta: parameters.meta,
+      realm: effectiveRealm,
+      request: request as never,
+      secretKey: parameters.secretKey,
+    }),
+    request,
+  }
+}
+
 /**
  * Captures the transport request into a frozen snapshot at the start of the
  * verification flow. This snapshot is threaded through request() → verify() →
@@ -715,7 +793,7 @@ function captureRequestFromInput(input: unknown): Method.CapturedRequest {
 }
 
 const coreBindingFields = ['amount', 'currency', 'recipient'] as const
-const methodBindingFields = ['chainId', 'memo', 'splits'] as const
+const methodBindingFields = ['chainId', 'memo', 'splits', 'unitType'] as const
 const pinnedRequestBindingFields = [...coreBindingFields, ...methodBindingFields] as const
 
 type CoreBindingField = (typeof coreBindingFields)[number]
@@ -785,6 +863,7 @@ function getPinnedRequestBinding(request: Record<string, unknown>): PinnedReques
   const memo = normalizeHex(methodDetails.memo)
   const recipient = normalizeScalar(request.recipient ?? methodDetails.recipient)
   const splits = normalizeComparable(methodDetails.splits)
+  const unitType = normalizeScalar(request.unitType ?? methodDetails.unitType)
 
   return {
     coreBinding: {
@@ -796,6 +875,7 @@ function getPinnedRequestBinding(request: Record<string, unknown>): PinnedReques
       ...(chainId !== undefined ? { chainId } : {}),
       ...(memo !== undefined ? { memo } : {}),
       ...(splits !== undefined ? { splits } : {}),
+      ...(unitType !== undefined ? { unitType } : {}),
     },
   }
 }

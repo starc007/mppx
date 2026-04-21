@@ -13,6 +13,8 @@ import * as Http from '~test/Http.js'
 import { deployEscrow } from '~test/tempo/session.js'
 import { accounts, asset, client } from '~test/tempo/viem.js'
 
+import type { SessionReceipt } from '../tempo/session/Types.js'
+
 const realm = 'api.example.com'
 const secretKey = 'test-secret-key'
 
@@ -2106,6 +2108,62 @@ describe('cross-route credential replay via scope binding flaw', () => {
     expect(result.status).toBe(402)
   })
 
+  test('rejects request-billed credential replayed at token-billed route', async () => {
+    const sessionMethod = Method.from({
+      name: 'mock',
+      intent: 'session',
+      schema: {
+        credential: { payload: z.object({ token: z.string() }) },
+        request: z.object({
+          amount: z.string(),
+          currency: z.string(),
+          recipient: z.string(),
+          unitType: z.string(),
+        }),
+      },
+    })
+
+    const sessionServerMethod = Method.toServer(sessionMethod, {
+      async verify() {
+        return mockReceipt()
+      },
+    })
+
+    const handler = Mppx.create({ methods: [sessionServerMethod], realm, secretKey })
+
+    const requestRoute = handler.session({
+      amount: '1',
+      currency: '0x0000000000000000000000000000000000000001',
+      expires: new Date(Date.now() + 60_000).toISOString(),
+      recipient: '0x0000000000000000000000000000000000000002',
+      unitType: 'request',
+    })
+    const tokenRoute = handler.session({
+      amount: '1',
+      currency: '0x0000000000000000000000000000000000000001',
+      expires: new Date(Date.now() + 60_000).toISOString(),
+      recipient: '0x0000000000000000000000000000000000000002',
+      unitType: 'token',
+    })
+
+    const first = await requestRoute(new Request('https://example.com/request'))
+    expect(first.status).toBe(402)
+    if (first.status !== 402) throw new Error()
+
+    const credential = Credential.from({
+      challenge: Challenge.fromResponse(first.challenge),
+      payload: { token: 'valid' },
+    })
+
+    const result = await tokenRoute(
+      new Request('https://example.com/token', {
+        headers: { Authorization: Credential.serialize(credential) },
+      }),
+    )
+
+    expect(result.status).toBe(402)
+  })
+
   test('rejects credential with mismatched method field', async () => {
     const otherMethod = Method.from({
       name: 'other',
@@ -3311,6 +3369,28 @@ describe('verifyCredential', () => {
     expect(receipt.method).toBe('beta')
   })
 
+  test('rejects credential when verified against different route economics', async () => {
+    const mppx = Mppx.create({
+      methods: [alphaChargeServer],
+      realm,
+      secretKey,
+    })
+
+    const challenge = await mppx.challenge.alpha.charge(challengeOpts)
+    const credential = Credential.from({ challenge, payload: { token: 'valid' } })
+
+    await expect(
+      mppx.verifyCredential(credential, {
+        request: {
+          amount: '100000',
+          currency: '0x0000000000000000000000000000000000000001',
+          decimals: 6,
+          recipient: '0x0000000000000000000000000000000000000002',
+        },
+      }),
+    ).rejects.toThrow()
+  })
+
   test('rejects credential with wrong HMAC (not issued by this server)', async () => {
     const mppx = Mppx.create({
       methods: [alphaChargeServer],
@@ -3696,6 +3776,73 @@ describe('verifyCredential', () => {
     expect(voucherReceipt.reference).toBe(openReceipt.reference)
 
     httpServer.close()
+  })
+
+  test('verifyCredential charges repeated session voucher content requests when capturedRequest is provided', async () => {
+    const escrowContract = await deployEscrow()
+    const server = Mppx.create({
+      methods: [
+        tempo.session({
+          store: Store.memory(),
+          getClient: () => client,
+          account: accounts[0],
+          currency: asset,
+          escrowContract,
+          chainId: client.chain!.id,
+        }),
+      ],
+      realm,
+      secretKey,
+    })
+    const route = server.session({ amount: '1', unitType: 'request' })
+    const clientMppx = Mppx_client.create({
+      polyfill: false,
+      methods: [
+        tempo_session_client({
+          account: accounts[1],
+          deposit: '10',
+          getClient: () => client,
+        }),
+      ],
+    })
+
+    const openChallengeResponse = await route(new Request('https://example.com/session'))
+    expect(openChallengeResponse.status).toBe(402)
+    if (openChallengeResponse.status !== 402) throw new Error()
+
+    const serializedOpenCredential = await clientMppx.createCredential(
+      openChallengeResponse.challenge,
+    )
+    await server.verifyCredential(serializedOpenCredential)
+
+    const voucherChallengeResponse = await route(new Request('https://example.com/session'))
+    expect(voucherChallengeResponse.status).toBe(402)
+    if (voucherChallengeResponse.status !== 402) throw new Error()
+
+    const serializedVoucherCredential = await clientMppx.createCredential(
+      voucherChallengeResponse.challenge,
+    )
+    const contentRequest = {
+      headers: new Headers(),
+      hasBody: false,
+      method: 'GET',
+      url: new URL('https://example.com/session'),
+    } as const
+    const routeRequest = { amount: '1', unitType: 'request' } as const
+
+    const firstReceipt = (await server.verifyCredential(serializedVoucherCredential, {
+      capturedRequest: contentRequest,
+      request: routeRequest,
+    })) as SessionReceipt
+    const secondReceipt = (await server.verifyCredential(serializedVoucherCredential, {
+      capturedRequest: contentRequest,
+      request: routeRequest,
+    })) as SessionReceipt
+
+    expect(BigInt(firstReceipt.spent)).toBeGreaterThan(0n)
+    expect(firstReceipt.units).toBe(1)
+    expect(BigInt(secondReceipt.spent)).toBeGreaterThan(BigInt(firstReceipt.spent))
+    expect(secondReceipt.units).toBe(2)
   })
 
   test('verifies a sponsored tempo credential created by the real client', async () => {
